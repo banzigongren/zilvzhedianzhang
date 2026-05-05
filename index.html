@@ -4706,7 +4706,7 @@ function renderTimeline(segments) {
   segments.forEach(function(seg) {
     var left = (seg.startMin / 1440) * 100;
     var width = ((seg.endMin - seg.startMin) / 1440) * 100;
-    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG['unknown'] || { label: '?', color: '#555', icon: '?' };
     var div = document.createElement('div');
     div.className = 'timeline-segment ' + seg.type;
     div.style.left = left + '%';
@@ -4737,7 +4737,7 @@ function renderTimeline(segments) {
 function renderLegend(segments) {
   var el = document.getElementById('timelineLegend');
   el.innerHTML = segments.map(function(seg) {
-    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG['unknown'] || { label: '?', color: '#555', icon: '?' };
     var dur = seg.endMin - seg.startMin;
     var editable = seg.type === 'unknown' || seg.source === 'manual';
     var onclick = editable ? ' onclick="handleLegendClick(\'' + seg.id + '\',\'' + seg.type + '\',' + seg.startMin + ',' + seg.endMin + ',\'' + (seg.label||'').replace(/'/g,"\\'") + '\',\'' + (seg.note||'').replace(/'/g,"\\'") + '\')"' : '';
@@ -4766,10 +4766,11 @@ function renderTimelineIn(segments, trackId, ticksId, suffix) {
   var track = document.getElementById(trackId);
   if (!track) return;
   track.innerHTML = '';
+  if (!SCHEDULE_TYPE_CFG) { console.error('SCHEDULE_TYPE_CFG is undefined!'); return; }
   segments.forEach(function(seg) {
     var left = (seg.startMin / 1440) * 100;
     var width = ((seg.endMin - seg.startMin) / 1440) * 100;
-    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG['unknown'] || { label: '?', color: '#555', icon: '?' };
     var div = document.createElement('div');
     div.className = 'timeline-segment ' + seg.type;
     div.style.left = left + '%';
@@ -4803,8 +4804,9 @@ function renderLegendIn(segments, legendId, suffix) {
   suffix = suffix || '';
   var el = document.getElementById(legendId);
   if (!el) return;
+  if (!SCHEDULE_TYPE_CFG) { console.error('SCHEDULE_TYPE_CFG is undefined!'); return; }
   el.innerHTML = segments.map(function(seg) {
-    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG['unknown'] || { label: '?', color: '#555', icon: '?' };
     var dur = seg.endMin - seg.startMin;
     var editable = seg.type === 'unknown' || seg.source === 'manual';
     var onclick = editable ? ' onclick="handleLegendClick' + suffix + '(\'' + seg.id + '\',\'' + seg.type + '\',' + seg.startMin + ',' + seg.endMin + ',\'' + (seg.label||'').replace(/'/g,"\\'") + '\',\'' + (seg.note||'').replace(/'/g,"\\'") + '\')"' : '';
@@ -4835,10 +4837,11 @@ function refreshStatsSchedule() {
 }
 
 function renderTypeLegend() {
+  if (!SCHEDULE_TYPE_CFG) return '';
   var types = ['waste','fun','study','work','sport','daily','sleep'];
   return '<div class="type-legend">' +
     types.map(function(t) {
-      var cfg = SCHEDULE_TYPE_CFG[t];
+      var cfg = SCHEDULE_TYPE_CFG[t] || { label: '?', color: '#555', icon: '?' };
       return '<span class="type-legend-item"><span class="type-legend-dot" style="background:' + cfg.color + '"></span>' + cfg.icon + ' ' + cfg.label + '</span>';
     }).join('') +
     '</div>';
@@ -4935,10 +4938,12 @@ function saveSeg_stats() {
   saveScheduleData(schedules);
   _editingSegId = null;
 
-  // 4. 刷新 UI（独立 try，保存成功即算成功）
+  // 4. 先显示成功提示（数据已保存成功）
+  showToast('✅ 已保存');
+
+  // 5. 刷新 UI（独立 try，保存成功即算成功）
   try { hideSegForm_stats(); } catch(e) {}
   try { refreshStatsSchedule(); } catch(e) { console.error('refreshStatsSchedule error', e); }
-  showToast('✅ 已保存');
 }
 
 function deleteSeg_stats() {
@@ -4956,10 +4961,10 @@ function deleteSeg_stats() {
 function initTypeChipsIn(selected, chipsId) {
   _selectedSegType = selected || 'daily';
   var el = document.getElementById(chipsId);
-  if (!el) return;
+  if (!el || !SCHEDULE_TYPE_CFG) return;
   var types = ['waste','fun','study','work','sport','daily','sleep'];
   el.innerHTML = types.map(function(t) {
-    var cfg = SCHEDULE_TYPE_CFG[t];
+    var cfg = SCHEDULE_TYPE_CFG[t] || { label: '?', color: '#555', icon: '?' };
     var sel = t === _selectedSegType ? ' selected' : '';
     return '<span class="type-chip' + sel + '" onclick="selectSegTypeIn(\'' + t + '\',this)">' + cfg.icon + cfg.label + '</span>';
   }).join('');
@@ -5023,9 +5028,10 @@ function hideSegForm() {
 function initTypeChips(selected) {
   _selectedSegType = selected || 'daily';
   var el = document.getElementById('segTypeChips');
+  if (!el || !SCHEDULE_TYPE_CFG) return;
   var types = ['waste','fun','study','work','sport','daily','sleep'];
   el.innerHTML = types.map(function(t) {
-    var cfg = SCHEDULE_TYPE_CFG[t];
+    var cfg = SCHEDULE_TYPE_CFG[t] || { label: '?', color: '#555', icon: '?' };
     var sel = t === _selectedSegType ? ' selected' : '';
     return '<span class="type-chip' + sel + '" onclick="selectSegType(\'' + t + '\',this)">' + cfg.icon + cfg.label + '</span>';
   }).join('');
