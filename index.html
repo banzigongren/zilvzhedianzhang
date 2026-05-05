@@ -768,6 +768,61 @@
       overflow-y: auto; color: var(--text);
     }
 
+    /* ===== TIMER TAG MODAL ===== */
+    .tag-modal-overlay {
+      position: fixed; inset: 0; z-index: 99998;
+      background: rgba(0,0,0,0.8);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .tag-modal {
+      background: #1a1a2e; border: 1px solid rgba(245,166,35,0.35);
+      border-radius: 16px; padding: 20px;
+      width: 100%; max-width: 400px; max-height: 90vh;
+      overflow-y: auto; color: var(--text);
+      position: relative;
+    }
+    .tag-modal h2 { font-size: 16px; margin-bottom: 16px; color: var(--gold); }
+    .tag-modal .section-label {
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .tag-chips {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+    }
+    .tag-chip {
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer;
+      background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+      color: var(--text); transition: all 0.15s; user-select: none;
+    }
+    .tag-chip.selected {
+      background: rgba(245,166,35,0.25); border-color: var(--gold); color: var(--gold);
+    }
+    .tag-input-wrap {
+      display: flex; gap: 8px; margin-bottom: 16px; align-items: center;
+    }
+    .tag-input-wrap input {
+      flex: 1; background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 12px; color: var(--text);
+      font-size: 13px; outline: none;
+    }
+    .tag-input-wrap button {
+      padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer;
+      background: rgba(245,166,35,0.2); color: var(--gold); font-size: 13px;
+    }
+    .note-textarea {
+      width: 100%; background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px; color: var(--text);
+      font-size: 13px; resize: none; outline: none; min-height: 72px;
+      margin-bottom: 16px;
+    }
+    .timer-log-tag {
+      font-size: 11px; background: rgba(245,166,35,0.2); color: var(--gold);
+      border-radius: 10px; padding: 2px 8px; margin-left: 4px;
+    }
+    .timer-log-note {
+      font-size: 11px; color: var(--muted); margin-top: 3px; padding-left: 2px;
+    }
+
     /* ===== MANUAL RECORD MODAL ===== */
     .manual-modal-overlay {
       position: fixed; inset: 0; z-index: 99995;
@@ -777,15 +832,13 @@
     }
     .manual-modal {
       background: #1a1a2e; border: 1px solid rgba(245,166,35,0.3);
-      border-radius: 16px; padding: 20px;
-      width: 100%; max-width: 400px; max-height: 90vh;
+      border-radius: 16px; padding: 16px;
+      width: 100%; max-width: 400px; max-height: 88vh;
       overflow-y: auto; color: var(--text);
       position: relative;
     }
     .manual-modal h2 {
-      text-align: center; color: var(--gold);
-      font-size: 18px; letter-spacing: 2px;
-      margin-bottom: 16px;
+      font-size: 15px; margin-bottom: 12px; color: var(--gold);
     }
     .manual-section {
       margin-bottom: 16px;
@@ -1036,6 +1089,211 @@
       color: var(--text); font-size: 14px;
       text-align: center; outline: none;
     }
+
+    /* ===== SCHEDULE TIMELINE ===== */
+    .schedule-modal-overlay {
+      position: fixed; inset: 0; z-index: 99996;
+      background: rgba(0,0,0,0.8);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 24px 12px; overflow-y: auto;
+    }
+    .schedule-modal {
+      background: #1a1a2e; border: 1px solid rgba(245,166,35,0.3);
+      border-radius: 16px; padding: 16px;
+      width: 100%; max-width: 420px;
+      color: var(--text); position: relative;
+    }
+    .schedule-modal h2 {
+      font-size: 15px; margin-bottom: 8px; color: var(--gold);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .schedule-date { font-size: 13px; color: var(--teal); margin-bottom: 12px; }
+    .timeline-container {
+      background: var(--card2); border-radius: 10px;
+      padding: 10px; margin-bottom: 12px; overflow-x: auto;
+    }
+    .timeline-track {
+      position: relative; height: 36px;
+      min-width: 100%; background: rgba(0,0,0,0.3);
+      border-radius: 6px; overflow: hidden;
+    }
+    .timeline-segment {
+      position: absolute; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: #fff; font-weight: 600;
+      cursor: pointer; transition: filter 0.15s;
+      border-right: 1px solid rgba(0,0,0,0.2);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      padding: 0 3px;
+    }
+    .timeline-segment:hover { filter: brightness(1.3); }
+    .timeline-segment.unknown { background: #3a3a5a; }
+    .timeline-segment.unknown:hover { background: #4a4a6a; }
+    .timeline-ticks {
+      position: relative; height: 16px; min-width: 100%; margin-top: 2px;
+    }
+    .timeline-tick {
+      position: absolute; transform: translateX(-50%);
+      font-size: 9px; color: var(--muted);
+    }
+    .legend-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid var(--border);
+      font-size: 12px; cursor: pointer;
+    }
+    .legend-item:last-child { border-bottom: none; }
+    .legend-item.unknown { opacity: 0.5; }
+    .legend-color { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    .legend-time { color: var(--muted); font-size: 11px; min-width: 85px; }
+    .legend-label { flex: 1; }
+    .legend-dur { font-size: 10px; color: var(--muted); }
+    .legend-note { font-size: 10px; color: var(--muted); font-style: italic; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .legend-score { font-size: 10px; font-weight: bold; min-width: 32px; text-align: right; }
+    .legend-score.zero { color: var(--accent); }
+    .legend-score.bonus { color: var(--green); }
+    .legend-score.base { color: var(--teal); }
+    .type-legend { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    .type-legend-item { display:flex; align-items:center; gap:3px; font-size:11px; color:var(--text); }
+    .type-legend-dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+    .add-seg-btn {
+      width: 100%; padding: 8px; margin-top: 8px;
+      background: rgba(245,166,35,0.1); border: 1px dashed rgba(245,166,35,0.3);
+      border-radius: 8px; color: var(--gold); font-size: 12px; cursor: pointer;
+    }
+    .seg-form {
+      background: var(--card2); border-radius: 10px;
+      padding: 12px; margin-top: 8px;
+    }
+    .seg-form-title { font-size: 13px; color: var(--gold); margin-bottom: 8px; }
+    .seg-form-row {
+      display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+    }
+    .seg-form-row label { font-size: 11px; color: var(--muted); min-width: 36px; }
+    .seg-form-row select, .seg-form-row input {
+      background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px; color: var(--text); font-size: 12px;
+    }
+    .seg-form-row select { flex: 1; }
+    .seg-form-row input { flex: 1; }
+    .type-chips { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+    .type-chip {
+      padding: 4px 10px; border-radius: 14px; font-size: 11px;
+      cursor: pointer; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.05); color: var(--text);
+      transition: all 0.15s;
+    }
+    .type-chip.selected {
+      border-color: var(--gold); background: rgba(245,166,35,0.2); color: var(--gold);
+    }
+    .seg-form-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+    /* ===== QUOTE MODAL ===== */
+    .quote-modal-overlay {
+      position: fixed; inset: 0; z-index: 99997;
+      background: rgba(0,0,0,0.8);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.3s ease;
+    }
+    .quote-modal {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border: 1px solid rgba(245,166,35,0.4);
+      border-radius: 18px;
+      padding: 28px 24px 24px;
+      width: 100%; max-width: 420px;
+      color: var(--text);
+      position: relative;
+      box-shadow: 0 0 40px rgba(245,166,35,0.15);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .quote-modal .close-btn {
+      position: absolute; top: 12px; right: 14px;
+      background: rgba(255,255,255,0.08); border: none;
+      color: var(--muted); font-size: 18px;
+      cursor: pointer; width: 30px; height: 30px;
+      border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .quote-modal .close-btn:hover {
+      background: rgba(255,255,255,0.15); color: var(--text);
+    }
+    .quote-modal .quote-label {
+      font-size: 11px; color: var(--gold); letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 16px;
+      text-align: center; opacity: 0.7;
+    }
+    .quote-modal .quote-text {
+      font-size: 18px; line-height: 1.8;
+      color: #f0e6d3;
+      text-align: center;
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+      padding: 0 4px;
+      margin-bottom: 20px;
+      font-family: 'PingFang SC', 'STKaiti', 'KaiTi', serif;
+    }
+    .quote-modal .quote-divider {
+      width: 40px; height: 2px;
+      background: rgba(245,166,35,0.3);
+      margin: 0 auto 16px;
+      border-radius: 1px;
+    }
+    .quote-modal .quote-actions {
+      display: flex; gap: 8px; justify-content: center;
+    }
+    .quote-modal .quote-actions button {
+      padding: 8px 20px; border-radius: 10px;
+      border: 1px solid rgba(245,166,35,0.3);
+      background: rgba(245,166,35,0.1);
+      color: var(--gold); font-size: 13px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .quote-modal .quote-actions button:hover {
+      background: rgba(245,166,35,0.2);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* ===== QUOTE MANAGE (规则页) ===== */
+    .quote-manage-list {
+      max-height: 320px; overflow-y: auto;
+      margin-bottom: 12px;
+    }
+    .quote-manage-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; margin-bottom: 4px;
+      background: var(--card2); border-radius: 8px;
+      font-size: 13px; line-height: 1.5;
+      word-wrap: break-word; word-break: break-word;
+    }
+    .quote-manage-item .q-index {
+      color: var(--gold); font-weight: 700;
+      min-width: 28px; flex-shrink: 0;
+      font-size: 11px; margin-top: 1px;
+    }
+    .quote-manage-item .q-text {
+      flex: 1; color: var(--text);
+    }
+    .quote-manage-item .q-del {
+      background: none; border: none; color: var(--accent);
+      cursor: pointer; font-size: 14px; flex-shrink: 0;
+      padding: 0 4px;
+    }
+    .quote-empty {
+      text-align: center; color: var(--muted);
+      font-size: 13px; padding: 20px 0;
+    }
+    .quote-count {
+      font-size: 12px; color: var(--muted);
+      margin-bottom: 8px;
+    }
   </style>
 </head>
 <body>
@@ -1139,15 +1397,37 @@
   </div>
 
   <div class="card">
-    <div class="card-title"><span class="icon">📵</span>今日娱乐手机时间</div>
+    <div class="card-title"><span class="icon">📵</span>今日浪费时间</div>
     <div class="input-row">
       <input class="input-field" type="number" id="phoneMin" min="0" max="600" placeholder="0" inputmode="numeric" />
       <span class="input-unit">分钟</span>
     </div>
-    <div style="margin-top:8px; font-size:12px; color:var(--muted);">
-      基础分 = 1440 - 娱乐手机时间（不含学习/工作/运动时段）
-    </div>
+  <div style="margin-top:8px; font-size:12px; color:var(--muted);">
+    基础分 = 1440 - 浪费时间（不含学习/工作/运动时段）
   </div>
+</div>
+
+<div class="card">
+  <div class="card-title"><span class="icon">🎮</span>今日娱乐时间</div>
+  <div class="input-row">
+    <input class="input-field" type="number" id="funMin" min="0" max="600" placeholder="0" inputmode="numeric" />
+    <span class="input-unit">分钟</span>
+  </div>
+  <div style="margin-top:8px; font-size:12px; color:var(--muted);">
+    娱乐得基础分（1分/分钟），无额外加分
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title"><span class="icon">🏠</span>今日日常时间</div>
+  <div class="input-row">
+    <input class="input-field" type="number" id="dailyMin" min="0" max="600" placeholder="0" inputmode="numeric" />
+    <span class="input-unit">分钟</span>
+  </div>
+  <div style="margin-top:8px; font-size:12px; color:var(--muted);">
+    日常得基础分（1分/分钟），无额外加分
+  </div>
+</div>
 
   <!-- 实时预览 -->
   <div class="card" id="dailyTitleCard" style="display:none;">
@@ -1191,6 +1471,8 @@
   </div>
 
   <button class="btn btn-primary" onclick="saveCheckin()">✅ 确认今日打卡</button>
+  <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(26,188,156,0.15);color:var(--teal);" onclick="syncFromSchedule()">📅 从日程同步</button>
+  <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(255,255,255,0.05);color:var(--muted);" onclick="openManualCheckinModal()">📝 补记/编辑其他日期</button>
 </div>
 
 <!-- ============================== -->
@@ -1573,11 +1855,19 @@
     </div>
   </div>
 
-</div>
+  <div class="card">
+    <div class="section-title">📜 格言警句库</div>
+    <div class="quote-count" id="quoteCount">当前共 0 句格言</div>
+    <div class="quote-manage-list" id="quoteManageList">
+      <div class="quote-empty">格言库为空，请在下方输入框中添加。</div>
+    </div>
+    <div class="tag-input-wrap">
+      <input type="text" id="newQuoteInput" placeholder="输入新的格言警句…" maxlength="200">
+      <button onclick="submitNewQuote()">添加</button>
+    </div>
+  </div>
 
-<!-- ============================== -->
-<!-- PAGE: 睡眠打卡                  -->
-<!-- ============================== -->
+</div>
 <div class="page" id="page-sleep">
 
   <!-- 未入睡状态 -->
@@ -1808,7 +2098,7 @@
         <span class="unit">分钟</span>
       </div>
       <div class="manual-row">
-        <label>娱乐手机</label>
+        <label>浪费</label>
         <input type="number" id="manualPhone" min="0" max="600" placeholder="0" inputmode="numeric">
         <span class="unit">分钟</span>
       </div>
@@ -1829,6 +2119,32 @@
     <div class="manual-btn-row">
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted);" onclick="closeManualCheckinModal()">取消</button>
       <button class="btn btn-gold" id="manualCheckinSaveBtn" onclick="saveManualCheckin()">➕ 添加记录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- TIMER TAG & NOTE MODAL          -->
+<!-- ============================== -->
+<div class="tag-modal-overlay" id="timerTagOverlay" style="display:none;">
+  <div class="tag-modal">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px;" id="timerTagModeHint"></div>
+    <h2>🏷️ 添加标签和备注</h2>
+
+    <div class="section-label">选择标签（可多选，可跳过）</div>
+    <div class="tag-chips" id="timerTagChips"></div>
+
+    <div class="tag-input-wrap">
+      <input type="text" id="timerTagInput" placeholder="输入新标签后点击添加" maxlength="12">
+      <button onclick="addNewTimerTag()">＋ 添加</button>
+    </div>
+
+    <div class="section-label">备注（可选）</div>
+    <textarea class="note-textarea" id="timerNoteInput" placeholder="输入本次记录的备注…"></textarea>
+
+    <div class="manual-btn-row">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted);" onclick="saveTimerWithTag(true)">跳过，直接保存</button>
+      <button class="btn btn-gold" onclick="saveTimerWithTag(false)">✅ 保存记录</button>
     </div>
   </div>
 </div>
@@ -1861,9 +2177,75 @@
       <span style="font-size:12px;color:var(--muted);">分钟</span>
     </div>
 
+    <div style="margin-top:8px;">
+      <div class="section-label">标签（可选）</div>
+      <div class="tag-chips" id="manualTimerTagChips"></div>
+      <div class="tag-input-wrap">
+        <input type="text" id="manualTimerTagInput" placeholder="输入新标签" maxlength="12">
+        <button onclick="addManualTimerTag()">＋</button>
+      </div>
+    </div>
+
+    <div style="margin-top:2px;">
+      <div class="section-label">备注（可选）</div>
+      <textarea class="note-textarea" id="manualTimerNoteInput" placeholder="输入备注…" style="margin-bottom:8px;min-height:56px;"></textarea>
+    </div>
+
     <div class="manual-btn-row">
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted);" onclick="closeManualTimerModal()">取消</button>
       <button class="btn btn-gold" onclick="saveManualTimer()">➕ 添加计时</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- SCHEDULE TIMELINE MODAL         -->
+<!-- ============================== -->
+<div class="schedule-modal-overlay" id="scheduleModal" style="display:none;">
+  <div class="schedule-modal">
+    <h2>
+      <span>📅 日程时间轴</span>
+      <button onclick="closeScheduleModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">✕</button>
+    </h2>
+    <div class="schedule-date" id="scheduleModalDate"></div>
+
+    <div class="timeline-container">
+      <div class="timeline-track" id="timelineTrack"></div>
+      <div class="timeline-ticks" id="timelineTicks"></div>
+    </div>
+
+    <div class="legend-title">时段详情（点击灰色段可补充）</div>
+    <div id="timelineLegend"></div>
+
+    <button class="add-seg-btn" onclick="showAddSegForm()">＋ 添加时段</button>
+
+    <div class="seg-form" id="segForm" style="display:none;">
+      <div class="seg-form-title" id="segFormTitle">添加时段</div>
+      <div class="seg-form-row">
+        <label>类型</label>
+        <div class="type-chips" id="segTypeChips"><span class="type-chip" onclick="selectSegTypeIn('waste',this)">📵浪费</span><span class="type-chip" onclick="selectSegTypeIn('fun',this)">🎮娱乐</span><span class="type-chip" onclick="selectSegTypeIn('study',this)">📚学习</span><span class="type-chip" onclick="selectSegTypeIn('work',this)">💼工作</span><span class="type-chip" onclick="selectSegTypeIn('sport',this)">🏃运动</span><span class="type-chip selected" onclick="selectSegTypeIn('daily',this)">🏠日常</span><span class="type-chip" onclick="selectSegTypeIn('sleep',this)">🌙睡眠</span></div>
+      </div>
+      <div class="seg-form-row">
+        <label>开始</label>
+        <select id="segStartH"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option></select><span style="color:var(--muted)">:</span><select id="segStartM"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option><option value="49">49</option><option value="50">50</option><option value="51">51</option><option value="52">52</option><option value="53">53</option><option value="54">54</option><option value="55">55</option><option value="56">56</option><option value="57">57</option><option value="58">58</option><option value="59">59</option></select>
+      </div>
+      <div class="seg-form-row">
+        <label>结束</label>
+        <select id="segEndH"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option></select><span style="color:var(--muted)">:</span><select id="segEndM"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option><option value="49">49</option><option value="50">50</option><option value="51">51</option><option value="52">52</option><option value="53">53</option><option value="54">54</option><option value="55">55</option><option value="56">56</option><option value="57">57</option><option value="58">58</option><option value="59">59</option></select>
+      </div>
+      <div class="seg-form-row">
+        <label>标签</label>
+        <input type="text" id="segLabel" placeholder="可选" maxlength="12">
+      </div>
+      <div class="seg-form-row">
+        <label>备注</label>
+        <input type="text" id="segNote" placeholder="可选" maxlength="50">
+      </div>
+      <div class="seg-form-actions">
+        <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted);flex:1;" onclick="hideSegForm()">取消</button>
+        <button class="btn btn-sm" id="delSegBtn" style="display:none;background:rgba(233,69,96,0.2);color:#e94560;flex:1;" onclick="deleteSeg()">删除</button>
+        <button class="btn btn-gold btn-sm" style="flex:1;" onclick="saveSeg()">保存</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1914,14 +2296,41 @@
 <div class="toast" id="toast"></div>
 
 <!-- ============================== -->
+<!-- QUOTE MODAL                    -->
+<!-- ============================== -->
+<div class="quote-modal-overlay" id="quoteOverlay" style="display:none;">
+  <div class="quote-modal">
+    <button class="close-btn" onclick="closeQuoteModal()">✕</button>
+    <div class="quote-label">📜 今日格言</div>
+    <div class="quote-divider"></div>
+    <div class="quote-text" id="quoteText"></div>
+    <div class="quote-divider"></div>
+    <div class="quote-actions">
+      <button onclick="showAnotherQuote()">🎲 换一句</button>
+      <button onclick="closeQuoteModal()">✅ 知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
 <!-- JAVASCRIPT                      -->
 <!-- ============================== -->
 <script>
+// 全局错误捕获
+window.onerror = function(msg, src, line, col, err) {
+  console.error('全局错误:', msg, src, line, col, err);
+  var toastEl = document.getElementById('toast');
+  if (toastEl) { toastEl.textContent = '错误[L' + line + ']: ' + msg; toastEl.classList.add('show'); setTimeout(function(){ toastEl.classList.remove('show'); }, 5000); }
+  return true;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('未处理Promise:', e.reason);
+});
 // ========== 数据模型 ==========
 const KEY = 'codex_data_v2';
 const SYNC_TOKEN_KEY = 'codex_sync_token';
 const SYNC_GIST_KEY  = 'codex_sync_gist_id';
-const SYNC_DATA_KEYS = ['codex_data_v2','codex_timer_v1','codex_timer_log_v1','codex_sleep_v1','codex_sleep_log_v1'];
+const SYNC_DATA_KEYS = ['codex_data_v2','codex_timer_v1','codex_timer_log_v1','codex_sleep_v1','codex_sleep_log_v1','codex_schedule_v1','codex_quotes_v1'];
 
 function loadData() {
   try {
@@ -1982,7 +2391,7 @@ function initTimePicker() {
     if (h === 23) o.selected = true;
     hSel.appendChild(o);
   }
-  for (let m = 0; m < 60; m += 5) {
+  for (let m = 0; m < 60; m += 1) {
     const o = document.createElement('option');
     o.value = m;
     o.textContent = String(m).padStart(2,'0');
@@ -1991,12 +2400,12 @@ function initTimePicker() {
 }
 
 // ========== 积分计算核心 ==========
-function calcScores(studyM, workM, sportM, phoneM) {
-  // 基础分：1440 - 娱乐手机时间 - 学习时间 - 工作时间 - 运动时间（互斥）
-  // 按规则：使用手机娱乐时段不得分，其他时段得基础分1分/分钟
-  const occupied = Math.min(studyM + workM + sportM + phoneM, 1440);
-  const baseScore = 1440 - phoneM - studyM - workM - sportM;
-  const base = Math.max(0, baseScore);
+// wasteM: 浪费(0分)；funM/dailyM: 得基础分1分/分钟；study/work/sport: 2分/分钟
+function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
+  // 基础分：1440 - 浪费 - 学/工/运动(互斥，不重复计基础分)
+  // fun/daily/sleep 不扣除，正常得基础分
+  const baseScore = Math.max(0, 1440 - wasteM - studyM - workM - sportM);
+  const base = baseScore;
 
   const studyScore = studyM * 2;
   const studyBonus = studyM > 120 ? (studyM - 120) : 0;
@@ -2132,11 +2541,13 @@ function updatePreview() {
   const studyM = parseInt(document.getElementById('studyMin').value) || 0;
   const workM  = parseInt(document.getElementById('workMin').value) || 0;
   const sportM = parseInt(document.getElementById('sportMin').value) || 0;
-  const phoneM = parseInt(document.getElementById('phoneMin').value) || 0;
+  const wasteM = parseInt(document.getElementById('phoneMin').value) || 0;
+  const funM   = parseInt(document.getElementById('funMin').value) || 0;
+  const dailyM = parseInt(document.getElementById('dailyMin').value) || 0;
   const sleepH = parseInt(document.getElementById('sleepHour').value) || 23;
   const sleepM = parseInt(document.getElementById('sleepMinute').value) || 0;
 
-  const sc = calcScores(studyM, workM, sportM, phoneM);
+  const sc = calcScores(studyM, workM, sportM, wasteM, funM, dailyM);
   const coins = calcSleepCoins(sleepH, sleepM);
 
   document.getElementById('prev-base').textContent   = sc.base;
@@ -2233,7 +2644,9 @@ function saveCheckin() {
   const studyM = parseInt(document.getElementById('studyMin').value) || 0;
   const workM  = parseInt(document.getElementById('workMin').value) || 0;
   const sportM = parseInt(document.getElementById('sportMin').value) || 0;
-  const phoneM = parseInt(document.getElementById('phoneMin').value) || 0;
+  const wasteM = parseInt(document.getElementById('phoneMin').value) || 0;
+  const funM   = parseInt(document.getElementById('funMin').value) || 0;
+  const dailyM = parseInt(document.getElementById('dailyMin').value) || 0;
   const sleepH = parseInt(document.getElementById('sleepHour').value) || 23;
   const sleepM = parseInt(document.getElementById('sleepMinute').value) || 0;
 
@@ -2245,7 +2658,7 @@ function saveCheckin() {
     return;
   }
 
-  const sc = calcScores(studyM, workM, sportM, phoneM);
+  const sc = calcScores(studyM, workM, sportM, wasteM, funM, dailyM);
   let coinEarned = calcSleepCoins(sleepH, sleepM);
 
   // 计算每日称号
@@ -2260,7 +2673,7 @@ function saveCheckin() {
 
   const record = {
     date,
-    studyM, workM, sportM, phoneM,
+    studyM, workM, sportM, wasteM, funM, dailyM,
     sleepH, sleepM,
     ...sc,
     total: totalScore,
@@ -2293,6 +2706,7 @@ function saveCheckin() {
   else if (titles.nightWatch) titleMsg = '🌙 守夜人！22:30前入睡！';
   const baseMsg = `🎉 打卡成功！获得 ${coinEarned} 金币，${totalScore} 积分`;
   showToast(titleMsg ? titleMsg + ' ' + baseMsg : baseMsg);
+  showQuoteModal('evening');
 }
 
 // ========== 连续天数计算 ==========
@@ -2485,6 +2899,7 @@ function renderAll() {
   renderWallet();
   renderStreak();
   renderHistory();
+  renderQuoteManage();
   updateExchangePreview();
 }
 
@@ -2493,20 +2908,22 @@ function renderStats() {
   const date = today();
   const rec = G.records.find(r => r.date === date);
   const el = document.getElementById('statsContent');
+
+  var schedule = getDaySchedule(date);
+
+  var statsCards = '';
   if (!rec) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div>今日尚未打卡，请先完成打卡</div>`;
-    return;
-  }
+    statsCards = '<div class="empty" style="padding:16px 0;"><div class="empty-icon">📊</div>今日尚未打卡，请先完成打卡</div>';
+  } else {
+    const sleepLabel = (() => {
+      const t = rec.sleepH * 60 + rec.sleepM;
+      if (t <= 22*60+30) return '<span class="badge badge-gold">22:30前 +10金币</span>';
+      if (t <= 23*60)    return '<span class="badge badge-blue">23:00前 +8金币</span>';
+      if (t <= 23*60+30) return '<span class="badge badge-purple">23:30前 +6金币</span>';
+      return '<span class="badge badge-red">晚于23:30 +0</span>';
+    })();
 
-  const sleepLabel = (() => {
-    const t = rec.sleepH * 60 + rec.sleepM;
-    if (t <= 22*60+30) return '<span class="badge badge-gold">22:30前 +10金币</span>';
-    if (t <= 23*60)    return '<span class="badge badge-blue">23:00前 +8金币</span>';
-    if (t <= 23*60+30) return '<span class="badge badge-purple">23:30前 +6金币</span>';
-    return '<span class="badge badge-red">晚于23:30 +0</span>';
-  })();
-
-  el.innerHTML = `
+    statsCards = `
     <div class="card">
       <div class="card-title"><span class="icon">📅</span>${formatDate(date)}  今日报告</div>
       <div class="score-grid">
@@ -2551,9 +2968,57 @@ function renderStats() {
       ${renderTimeBar('学习', rec.studyM, 600, '#a29bfe')}
       ${renderTimeBar('工作', rec.workM, 720, '#55efc4')}
       ${renderTimeBar('运动', rec.sportM, 60, '#e94560')}
-      ${renderTimeBar('娱乐手机', rec.phoneM, 300, '#fd79a8')}
-    </div>
-  `;
+      ${renderTimeBar('浪费', rec.phoneM, 300, '#fd79a8')}
+    </div>`;
+  }
+
+  // 日程时间轴卡片（始终显示）
+  var scheduleCard = `
+    <div class="card">
+      <div class="card-title"><span class="icon">📅</span>今日日程时间轴</div>
+      <div class="type-legend"><span class="type-legend-item"><span class="type-legend-dot" style="background:#e94560"></span>📵 浪费</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#9b59b6"></span>🎮 娱乐</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#4caf50"></span>📚 学习</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#5b8cff"></span>💼 工作</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#55efc4"></span>🏃 运动</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#f5a623"></span>🏠 日常</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#2a2a4a;border:1px solid #555"></span>🌙 睡眠</span></div>
+      <div class="timeline-container">
+        <div class="timeline-track" id="statsTimelineTrack"></div>
+        <div class="timeline-ticks" id="statsTimelineTicks"></div>
+      </div>
+      <div class="legend-title">时段详情（点击灰色段可补充）</div>
+      <div id="statsTimelineLegend"></div>
+      <button class="add-seg-btn" onclick="showAddSegForm_stats()">＋ 添加时段</button>
+      <div class="seg-form" id="statsSegForm" style="display:none;">
+        <div class="seg-form-title" id="statsSegFormTitle">添加时段</div>
+        <div class="seg-form-row">
+          <label>类型</label>
+          <div class="type-chips" id="statsSegTypeChips"><span class="type-chip" onclick="selectSegTypeIn('waste',this)">📵浪费</span><span class="type-chip" onclick="selectSegTypeIn('fun',this)">🎮娱乐</span><span class="type-chip" onclick="selectSegTypeIn('study',this)">📚学习</span><span class="type-chip selected" onclick="selectSegTypeIn('work',this)">💼工作</span><span class="type-chip" onclick="selectSegTypeIn('sport',this)">🏃运动</span><span class="type-chip" onclick="selectSegTypeIn('daily',this)">🏠日常</span><span class="type-chip" onclick="selectSegTypeIn('sleep',this)">🌙睡眠</span></div>
+        </div>
+        <div class="seg-form-row">
+          <label>开始</label>
+          <select id="statsSegStartH"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option></select><span style="color:var(--muted)">:</span><select id="statsSegStartM"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option><option value="49">49</option><option value="50">50</option><option value="51">51</option><option value="52">52</option><option value="53">53</option><option value="54">54</option><option value="55">55</option><option value="56">56</option><option value="57">57</option><option value="58">58</option><option value="59">59</option></select>
+        </div>
+        <div class="seg-form-row">
+          <label>结束</label>
+          <select id="statsSegEndH"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option></select><span style="color:var(--muted)">:</span><select id="statsSegEndM"><option value="0">00</option><option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option><option value="32">32</option><option value="33">33</option><option value="34">34</option><option value="35">35</option><option value="36">36</option><option value="37">37</option><option value="38">38</option><option value="39">39</option><option value="40">40</option><option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option><option value="45">45</option><option value="46">46</option><option value="47">47</option><option value="48">48</option><option value="49">49</option><option value="50">50</option><option value="51">51</option><option value="52">52</option><option value="53">53</option><option value="54">54</option><option value="55">55</option><option value="56">56</option><option value="57">57</option><option value="58">58</option><option value="59">59</option></select>
+        </div>
+        <div class="seg-form-row">
+          <label>标签</label>
+          <input type="text" id="statsSegLabel" placeholder="可选" maxlength="12">
+        </div>
+        <div class="seg-form-row">
+          <label>备注</label>
+          <input type="text" id="statsSegNote" placeholder="可选" maxlength="50">
+        </div>
+        <div class="seg-form-actions">
+          <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--muted);flex:1;" onclick="hideSegForm_stats()">取消</button>
+          <button class="btn btn-sm" id="statsDelSegBtn" style="display:none;background:rgba(233,69,96,0.2);color:#e94560;flex:1;" onclick="deleteSeg_stats()">删除</button>
+          <button class="btn btn-gold btn-sm" style="flex:1;" onclick="saveSeg_stats()">保存</button>
+        </div>
+      </div>
+    </div>`;
+
+  el.innerHTML = statsCards + scheduleCard;
+
+  // 渲染日程时间轴
+  renderTimelineIn(schedule.segments, 'statsTimelineTrack', 'statsTimelineTicks', '_stats');
+  renderLegendIn(schedule.segments, 'statsTimelineLegend', '_stats');
 }
 
 function renderTimeBar(label, val, max, color) {
@@ -2716,7 +3181,7 @@ function renderHistory() {
   const header = document.getElementById('historyHeader');
   if (G.records.length === 0 && G.repairedDays.length === 0) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>`;
-    if (header) header.style.display = 'none';
+    if (header) header.style.display = 'flex';
     return;
   }
   if (header) header.style.display = 'flex';
@@ -2731,6 +3196,7 @@ function renderHistory() {
     return `
       <div class="history-item">
         <div class="history-actions">
+          <button class="history-action-btn" title="日程" onclick="openScheduleModal('${r.date}')">📅</button>
           <button class="history-action-btn" title="编辑" onclick="openManualCheckinModal('${r.date}')">✏️</button>
           <button class="history-action-btn" title="删除" onclick="deleteCheckinRecord('${r.date}')">🗑️</button>
         </div>
@@ -2898,6 +3364,9 @@ function timerTick() {
   document.getElementById('timerSessionMin').textContent = `本次 ${mins} 分钟`;
 }
 
+// 待保存的临时计时数据（等用户填完标签备注再真正写入）
+var _pendingTimer = null;
+
 function timerStop() {
   if (!timerState.running && !timerState.paused) return;
 
@@ -2911,22 +3380,38 @@ function timerStop() {
     return;
   }
 
-  // 累加到今日
-  timerAccum[timerState.mode] += mins;
+  // 先暂停界面，等用户填标签备注后再真正保存
+  _pendingTimer = {
+    mode: timerState.mode,
+    mins,
+    time: new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }),
+  };
+  timerReset();
+  openTimerTagModal();
+}
+
+function _commitTimerRecord(tag, note) {
+  if (!_pendingTimer) return;
+  const { mode, mins, time } = _pendingTimer;
+
+  // 累加今日
+  timerAccum[mode] += mins;
   saveTimerAccum(timerAccum);
 
   // 添加日志
   const logs = loadTimerLog();
   logs.push({
     date: today(),
-    mode: timerState.mode,
+    mode,
     mins,
-    time: new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }),
+    time,
+    tag: tag || '',
+    note: note || '',
   });
   saveTimerLog(logs);
 
-  showToast(`✅ ${MODE_CFG[timerState.mode].icon} ${MODE_CFG[timerState.mode].label.replace('计时','')} ${mins} 分钟已记录`);
-  timerReset();
+  _pendingTimer = null;
+  showToast(`✅ ${MODE_CFG[mode].icon} ${MODE_CFG[mode].label.replace('计时','')} ${mins} 分钟已记录`);
   renderTimerAccum();
   renderTimerLog();
 }
@@ -2986,11 +3471,17 @@ function renderTimerLog() {
   }
   el.innerHTML = logs.map(l => {
     const cfg = MODE_CFG[l.mode];
+    const tagHtml = l.tag ? `<span class="timer-log-tag">${l.tag}</span>` : '';
+    const noteHtml = l.note ? `<div class="timer-log-note">📝 ${l.note}</div>` : '';
     return `
       <div class="timer-log-item">
-        <span class="timer-log-type" style="color:${cfg.color}">${cfg.icon} ${l.mode === 'study' ? '学习' : l.mode === 'work' ? '工作' : '运动'}</span>
-        <span class="timer-log-dur">+${l.mins} 分钟</span>
+        <div style="display:flex;align-items:center;flex:1;gap:4px;flex-wrap:wrap;">
+          <span class="timer-log-type" style="color:${cfg.color}">${cfg.icon} ${l.mode === 'study' ? '学习' : l.mode === 'work' ? '工作' : '运动'}</span>
+          ${tagHtml}
+          <span class="timer-log-dur">+${l.mins} 分钟</span>
+        </div>
         <span class="timer-log-time">${l.time}</span>
+        ${noteHtml ? `<div style="width:100%">${noteHtml}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -3022,6 +3513,36 @@ function syncToCheckin() {
 
   switchTab('checkin');
   showToast(`⬆️ 已同步：学习${timerAccum.study}分 工作${timerAccum.work}分 运动${timerAccum.sport}分`);
+}
+
+// ========== 从日程时间轴同步到打卡页 ==========
+function syncFromSchedule() {
+  var date = today();
+  var schedule = getDaySchedule(date);
+  var segs = schedule.segments || [];
+
+  var studyM = 0, workM = 0, sportM = 0, wasteM = 0, funM = 0, dailyM = 0;
+
+  segs.forEach(function(seg) {
+    var dur = seg.endMin - seg.startMin;
+    if (seg.type === 'study') studyM += dur;
+    else if (seg.type === 'work') workM += dur;
+    else if (seg.type === 'sport') sportM += dur;
+    else if (seg.type === 'waste') wasteM += dur;
+    else if (seg.type === 'fun') funM += dur;
+    else if (seg.type === 'daily') dailyM += dur;
+    // sleep 不计入打卡字段
+  });
+
+  document.getElementById('studyMin').value = studyM;
+  document.getElementById('workMin').value = workM;
+  document.getElementById('sportMin').value = sportM;
+  document.getElementById('phoneMin').value = wasteM;
+  document.getElementById('funMin').value = funM;
+  document.getElementById('dailyMin').value = dailyM;
+
+  updatePreview();
+  showToast(`📅 已同步：学习${studyM}分 工作${workM}分 运动${sportM}分 浪费${wasteM}分 娱乐${funM}分 日常${dailyM}分`);
 }
 
 // ========== 睡眠打卡模块 ==========
@@ -3080,7 +3601,7 @@ function initSleepPage() {
     o.textContent = String(h % 24).padStart(2, '0');
     hSel.appendChild(o);
   }
-  for (let m = 0; m < 60; m += 5) {
+  for (let m = 0; m < 60; m += 1) {
     const o = document.createElement('option');
     o.value = m;
     o.textContent = String(m).padStart(2, '0');
@@ -3338,6 +3859,8 @@ function wakeUp() {
 
   // 显示起床结果
   showWakeResult(hrs, mins, sleepH, sleepM, now.getHours(), now.getMinutes(), coins);
+  // 起床后弹出格言警句
+  showQuoteModal('morning');
 }
 
 function showWakeResult(hrs, mins, sleepH, sleepM, wakeH, wakeM, coins) {
@@ -3432,7 +3955,7 @@ function renderSleepHistory() {
 }
 
 // ========== 绑定输入事件 ==========
-['studyMin','workMin','sportMin','phoneMin','sleepHour','sleepMinute'].forEach(id => {
+['studyMin','workMin','sportMin','phoneMin','funMin','dailyMin','sleepHour','sleepMinute'].forEach(id => {
   document.getElementById(id).addEventListener('input', updatePreview);
   document.getElementById(id).addEventListener('change', updatePreview);
 });
@@ -3440,7 +3963,30 @@ function renderSleepHistory() {
 // ========== 启动 ==========
 initTimePicker();
 displayToday();
+
+// 回填今日打卡数据到输入框
+(function fillTodayData() {
+  var rec = G.records.find(r => r.date === today());
+  if (rec) {
+    document.getElementById('studyMin').value = rec.studyM || 0;
+    document.getElementById('workMin').value = rec.workM || 0;
+    document.getElementById('sportMin').value = rec.sportM || 0;
+    // 兼容旧数据：旧记录用 phoneM，新记录用 wasteM
+    document.getElementById('phoneMin').value = (rec.wasteM ?? rec.phoneM) || 0;
+    document.getElementById('funMin').value = rec.funM || 0;
+    document.getElementById('dailyMin').value = rec.dailyM || 0;
+    document.getElementById('sleepHour').value = rec.sleepH != null ? rec.sleepH : 23;
+    document.getElementById('sleepMinute').value = rec.sleepM || 0;
+  } else if (timerAccum.date === today()) {
+    // 未打卡时从计时器数据回填
+    document.getElementById('studyMin').value = timerAccum.study || 0;
+    document.getElementById('workMin').value = timerAccum.work || 0;
+    document.getElementById('sportMin').value = timerAccum.sport || 0;
+  }
+})();
+
 updatePreview();
+initQuotesIfEmpty();
 renderAll();
 initTimer();
 initSleepPage();
@@ -3864,12 +4410,146 @@ function deleteRepairedDay(date) {
   showToast('🗑️ 已删除 ' + date + ' 的补签');
 }
 
+// ===== TIMER TAG & NOTE MODAL =====
+var TIMER_TAGS_KEY = 'codex_timer_tags_v1';
+var _selectedTimerTag = '';
+
+function loadTimerTags() {
+  try { var r = localStorage.getItem(TIMER_TAGS_KEY); if (r) return JSON.parse(r); } catch(e) {}
+  return [];
+}
+function saveTimerTags(tags) {
+  localStorage.setItem(TIMER_TAGS_KEY, JSON.stringify(tags));
+}
+// 确保标签列表含某个标签（去重）
+function ensureTimerTag(tag) {
+  if (!tag) return;
+  var tags = loadTimerTags();
+  if (tags.indexOf(tag) === -1) { tags.push(tag); saveTimerTags(tags); }
+}
+
+function openTimerTagModal() {
+  var tags = loadTimerTags();
+  var overlay = document.getElementById('timerTagOverlay');
+  var chipsEl = document.getElementById('timerTagChips');
+  _selectedTimerTag = '';
+  document.getElementById('timerTagInput').value = '';
+  document.getElementById('timerNoteInput').value = '';
+
+  // 模式提示
+  if (_pendingTimer) {
+    var cfg = MODE_CFG[_pendingTimer.mode];
+    document.getElementById('timerTagModeHint').textContent =
+      cfg.icon + ' ' + cfg.label.replace('计时','') + ' · ' + _pendingTimer.mins + ' 分钟';
+  }
+
+  // 渲染已有标签
+  if (tags.length === 0) {
+    chipsEl.innerHTML = '<span style="font-size:12px;color:var(--muted);">暂无历史标签，输入新标签后点击添加</span>';
+  } else {
+    chipsEl.innerHTML = tags.map(function(t) {
+      return '<span class="tag-chip" data-tag="' + t + '" onclick="toggleTimerTag(this)">' + t + '</span>';
+    }).join('');
+  }
+  overlay.style.display = 'flex';
+}
+
+function closeTimerTagModal() {
+  document.getElementById('timerTagOverlay').style.display = 'none';
+}
+
+function toggleTimerTag(el) {
+  // 单选逻辑
+  var chips = document.querySelectorAll('#timerTagChips .tag-chip');
+  var tag = el.getAttribute('data-tag');
+  if (_selectedTimerTag === tag) {
+    _selectedTimerTag = '';
+    el.classList.remove('selected');
+  } else {
+    chips.forEach(function(c) { c.classList.remove('selected'); });
+    _selectedTimerTag = tag;
+    el.classList.add('selected');
+  }
+}
+
+function addNewTimerTag() {
+  var input = document.getElementById('timerTagInput');
+  var val = input.value.trim();
+  if (!val) { showToast('请输入标签内容'); return; }
+  if (val.length > 12) { showToast('标签最多12个字符'); return; }
+  // 添加到历史
+  ensureTimerTag(val);
+  // 选中
+  _selectedTimerTag = val;
+  // 重新渲染 chips
+  var chipsEl = document.getElementById('timerTagChips');
+  var tags = loadTimerTags();
+  chipsEl.innerHTML = tags.map(function(t) {
+    var sel = t === val ? ' selected' : '';
+    return '<span class="tag-chip' + sel + '" data-tag="' + t + '" onclick="toggleTimerTag(this)">' + t + '</span>';
+  }).join('');
+  input.value = '';
+}
+
+function saveTimerWithTag(skip) {
+  var tag = skip ? '' : _selectedTimerTag;
+  var note = skip ? '' : document.getElementById('timerNoteInput').value.trim();
+  // 如果有标签，确保保存到历史
+  if (tag) ensureTimerTag(tag);
+  closeTimerTagModal();
+  _commitTimerRecord(tag, note);
+}
+
 // ===== MANUAL TIMER MODAL =====
+var _manualTimerTag = '';
+
 function openManualTimerModal() {
   var overlay = document.getElementById('manualTimerOverlay');
   document.getElementById('manualTimerDate').value = today();
   document.getElementById('manualTimerMins').value = '';
+  _manualTimerTag = '';
+  document.getElementById('manualTimerTagInput').value = '';
+  document.getElementById('manualTimerNoteInput').value = '';
+  // 渲染历史标签
+  var tags = loadTimerTags();
+  var chipsEl = document.getElementById('manualTimerTagChips');
+  if (tags.length === 0) {
+    chipsEl.innerHTML = '<span style="font-size:12px;color:var(--muted);">暂无标签</span>';
+  } else {
+    chipsEl.innerHTML = tags.map(function(t) {
+      return '<span class="tag-chip" data-tag="' + t + '" onclick="toggleManualTimerTag(this)">' + t + '</span>';
+    }).join('');
+  }
   overlay.style.display = 'flex';
+}
+
+function toggleManualTimerTag(el) {
+  var tag = el.getAttribute('data-tag');
+  if (_manualTimerTag === tag) {
+    _manualTimerTag = '';
+    el.classList.remove('selected');
+  } else {
+    var chips = document.querySelectorAll('#manualTimerTagChips .tag-chip');
+    chips.forEach(function(c) { c.classList.remove('selected'); });
+    _manualTimerTag = tag;
+    el.classList.add('selected');
+  }
+}
+
+function addManualTimerTag() {
+  var input = document.getElementById('manualTimerTagInput');
+  var val = input.value.trim();
+  if (!val) { showToast('请输入标签内容'); return; }
+  if (val.length > 12) { showToast('标签最多12个字符'); return; }
+  ensureTimerTag(val);
+  _manualTimerTag = val;
+  var chipsEl = document.getElementById('manualTimerTagChips');
+  var tags = loadTimerTags();
+  chipsEl.innerHTML = tags.map(function(t) {
+    var sel = t === val ? ' selected' : '';
+    return '<span class="tag-chip' + sel + '" data-tag="' + t + '" onclick="toggleManualTimerTag(this)">' + t + '</span>';
+  }).join('');
+  input.value = '';
 }
 
 function closeManualTimerModal() {
@@ -3880,10 +4560,13 @@ function saveManualTimer() {
   var date = document.getElementById('manualTimerDate').value;
   var mode = document.getElementById('manualTimerMode').value;
   var mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
+  var tag = _manualTimerTag;
+  var note = document.getElementById('manualTimerNoteInput').value.trim();
   if (!date) { showToast('请选择日期'); return; }
   if (mins < 1) { showToast('时长至少为1分钟'); return; }
+  if (tag) ensureTimerTag(tag);
   var logs = loadTimerLog();
-  logs.push({ date: date, mode: mode, mins: mins, time: '--:--', manual: true });
+  logs.push({ date: date, mode: mode, mins: mins, time: '--:--', manual: true, tag: tag, note: note });
   saveTimerLog(logs);
   if (date === today()) {
     timerAccum[mode] += mins;
@@ -3893,6 +4576,556 @@ function saveManualTimer() {
   showToast('✅ 已添加 ' + (mode === 'study' ? '学习' : mode === 'work' ? '工作' : '运动') + ' ' + mins + ' 分钟');
   closeManualTimerModal();
   renderTimerLog();
+}
+
+// ===== SCHEDULE TIMELINE =====
+var SCHEDULE_KEY = 'codex_schedule_v1';
+var SCHEDULE_TYPE_CFG = {
+  waste:   { label: '浪费', color: '#e94560', icon: '📵' },
+  fun:     { label: '娱乐', color: '#9b59b6', icon: '🎮' },
+  study:   { label: '学习', color: '#4caf50', icon: '📚' },
+  work:    { label: '工作', color: '#0f3460', icon: '💼' },
+  sport:   { label: '运动', color: '#55efc4', icon: '🏃' },
+  daily:   { label: '日常', color: '#f5a623', icon: '🏠' },
+  sleep:   { label: '睡眠', color: '#2a2a4a', icon: '🌙' },
+  unknown: { label: '待补充', color: '#3a3a5a', icon: '❓' }
+};
+
+function loadScheduleData() {
+  try { var r = localStorage.getItem(SCHEDULE_KEY); if (r) return JSON.parse(r); } catch(e) {}
+  return [];
+}
+function saveScheduleData(data) {
+  try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(data)); }
+  catch(e) { console.error('saveScheduleData error', e); showToast('存储写入失败: ' + e.message); }
+}
+function minToTime(m) {
+  var h = Math.floor(m / 60); var mm = m % 60;
+  return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+}
+function timeToMin(s) {
+  var parts = s.split(':'); return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+}
+
+function generateFromTimer(date) {
+  var logs = loadTimerLog().filter(function(l) { return l.date === date; });
+  var segs = [];
+  var modeMap = { study: 'study', work: 'work', sport: 'sport' };
+  logs.forEach(function(log) {
+    if (!log.time || log.time === '--:--') return;
+    var endMin = timeToMin(log.time);
+    var startMin = Math.max(0, endMin - log.mins);
+    segs.push({
+      id: 'timer_' + log.time + '_' + log.mode,
+      startMin: startMin, endMin: endMin,
+      type: modeMap[log.mode] || 'study',
+      label: log.tag || '',
+      note: log.note || '',
+      source: 'timer'
+    });
+  });
+  return segs;
+}
+
+function generateFromSleep(date) {
+  var raw = localStorage.getItem('codex_sleep_log_v1');
+  if (!raw) return [];
+  try { var logs = JSON.parse(raw); } catch(e) { return []; }
+  // 睡眠记录的 date 是入睡日期
+  var log = logs.find(function(l) { return l.date === date; });
+  if (!log) return [];
+  var sleepH = log.sleepH != null ? log.sleepH : (log.sleepTime ? new Date(log.sleepTime).getHours() : 23);
+  var sleepM = log.sleepM != null ? log.sleepM : (log.sleepTime ? new Date(log.sleepTime).getMinutes() : 0);
+  var startMin = sleepH * 60 + sleepM;
+  var dur = log.durationMin || 480;
+  var endMin = startMin + dur;
+  // 如果跨天，endMin > 1440 时截断到 1440
+  if (endMin > 1440) endMin = 1440;
+  return [{
+    id: 'sleep_' + date,
+    startMin: startMin, endMin: endMin,
+    type: 'sleep', label: '', source: 'sleep_log'
+  }];
+}
+
+function fillGaps(sortedSegs) {
+  var result = [];
+  var cur = 0;
+  sortedSegs.forEach(function(seg) {
+    if (seg.startMin > cur) {
+      result.push({
+        id: 'gap_' + cur, startMin: cur, endMin: seg.startMin,
+        type: 'unknown', label: '', source: 'auto'
+      });
+    }
+    result.push(seg);
+    cur = Math.max(cur, seg.endMin);
+  });
+  if (cur < 1440) {
+    result.push({
+      id: 'gap_end', startMin: cur, endMin: 1440,
+      type: 'unknown', label: '', source: 'auto'
+    });
+  }
+  return result;
+}
+
+function getDaySchedule(date) {
+  var timerSegs = generateFromTimer(date);
+  var sleepSegs = generateFromSleep(date);
+  var schedules = loadScheduleData();
+  var schedule = schedules.find(function(s) { return s.date === date; });
+  var manualSegs = schedule ? schedule.segments.filter(function(s) { return s.source === 'manual'; }) : [];
+  var all = [].concat(timerSegs, sleepSegs, manualSegs);
+  all.sort(function(a, b) { return a.startMin - b.startMin; });
+  return { date: date, segments: fillGaps(all) };
+}
+
+var _scheduleDate = null;
+var _editingSegId = null;
+var _selectedSegType = 'daily';
+
+function openScheduleModal(date) {
+  _scheduleDate = date;
+  _editingSegId = null;
+  document.getElementById('scheduleModalDate').textContent = date;
+  var schedule = getDaySchedule(date);
+  renderTimeline(schedule.segments);
+  renderLegend(schedule.segments);
+  hideSegForm();
+  document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+function closeScheduleModal() {
+  document.getElementById('scheduleModal').style.display = 'none';
+}
+
+function renderTimeline(segments) {
+  var track = document.getElementById('timelineTrack');
+  track.innerHTML = '';
+  segments.forEach(function(seg) {
+    var left = (seg.startMin / 1440) * 100;
+    var width = ((seg.endMin - seg.startMin) / 1440) * 100;
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var div = document.createElement('div');
+    div.className = 'timeline-segment ' + seg.type;
+    div.style.left = left + '%';
+    div.style.width = width + '%';
+    div.style.background = cfg.color;
+    if (width > 6) {
+      div.textContent = width > 12 ? cfg.icon + ' ' + (seg.label || cfg.label) : cfg.icon;
+    }
+    div.title = cfg.label + ' ' + minToTime(seg.startMin) + '-' + minToTime(seg.endMin);
+    div.onclick = function() {
+      if (seg.type === 'unknown') {
+        showAddSegForm(seg.startMin, seg.endMin);
+      } else if (seg.source === 'manual') {
+        showEditSegForm(seg);
+      }
+    };
+    track.appendChild(div);
+  });
+  // ticks
+  var ticks = document.getElementById('timelineTicks');
+  var thtml = '';
+  for (var h = 0; h <= 24; h += 3) {
+    thtml += '<span class="timeline-tick" style="left:' + ((h/24)*100) + '%">' + String(h).padStart(2,'0') + '</span>';
+  }
+  ticks.innerHTML = thtml;
+}
+
+function renderLegend(segments) {
+  var el = document.getElementById('timelineLegend');
+  el.innerHTML = segments.map(function(seg) {
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var dur = seg.endMin - seg.startMin;
+    var editable = seg.type === 'unknown' || seg.source === 'manual';
+    var onclick = editable ? ' onclick="handleLegendClick(\'' + seg.id + '\',\'' + seg.type + '\',' + seg.startMin + ',' + seg.endMin + ',\'' + (seg.label||'').replace(/'/g,"\\'") + '\',\'' + (seg.note||'').replace(/'/g,"\\'") + '\')"' : '';
+    // 积分标注：浪费=0分，娱乐/日常/睡眠=1分/分钟，学习/工作/运动=2分/分钟
+    var scoreLabel = '';
+    if (seg.type === 'waste') {
+      scoreLabel = '<span class="legend-score zero">0分</span>';
+    } else if (seg.type === 'study' || seg.type === 'work' || seg.type === 'sport') {
+      scoreLabel = '<span class="legend-score bonus">' + (dur * 2) + '分</span>';
+    } else if (seg.type === 'fun' || seg.type === 'daily' || seg.type === 'sleep') {
+      scoreLabel = '<span class="legend-score base">' + dur + '分</span>';
+    }
+    return '<div class="legend-item ' + seg.type + '"' + onclick + '>' +
+      '<div class="legend-color" style="background:' + cfg.color + '"></div>' +
+      '<span class="legend-time">' + minToTime(seg.startMin) + '-' + minToTime(seg.endMin) + '</span>' +
+      '<span class="legend-label">' + cfg.icon + ' ' + (seg.label || cfg.label) + '</span>' +
+      (seg.note ? '<span class="legend-note">' + seg.note + '</span>' : '') +
+      scoreLabel +
+      '<span class="legend-dur">' + dur + '分钟</span></div>';
+  }).join('');
+}
+
+// ===== 通用日程渲染（支持不同容器） =====
+function renderTimelineIn(segments, trackId, ticksId, suffix) {
+  suffix = suffix || '';
+  var track = document.getElementById(trackId);
+  if (!track) return;
+  track.innerHTML = '';
+  segments.forEach(function(seg) {
+    var left = (seg.startMin / 1440) * 100;
+    var width = ((seg.endMin - seg.startMin) / 1440) * 100;
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var div = document.createElement('div');
+    div.className = 'timeline-segment ' + seg.type;
+    div.style.left = left + '%';
+    div.style.width = width + '%';
+    div.style.background = cfg.color;
+    if (width > 6) {
+      div.textContent = width > 12 ? cfg.icon + ' ' + (seg.label || cfg.label) : cfg.icon;
+    }
+    div.title = cfg.label + ' ' + minToTime(seg.startMin) + '-' + minToTime(seg.endMin);
+    div.onclick = function() {
+      if (seg.type === 'unknown') {
+        if (suffix === '_stats') showAddSegForm_stats(seg.startMin, seg.endMin);
+        else showAddSegForm(seg.startMin, seg.endMin);
+      } else if (seg.source === 'manual') {
+        if (suffix === '_stats') showEditSegForm_stats(seg);
+        else showEditSegForm(seg);
+      }
+    };
+    track.appendChild(div);
+  });
+  var ticks = document.getElementById(ticksId);
+  if (!ticks) return;
+  var thtml = '';
+  for (var h = 0; h <= 24; h += 3) {
+    thtml += '<span class="timeline-tick" style="left:' + ((h/24)*100) + '%">' + String(h).padStart(2,'0') + '</span>';
+  }
+  ticks.innerHTML = thtml;
+}
+
+function renderLegendIn(segments, legendId, suffix) {
+  suffix = suffix || '';
+  var el = document.getElementById(legendId);
+  if (!el) return;
+  el.innerHTML = segments.map(function(seg) {
+    var cfg = SCHEDULE_TYPE_CFG[seg.type] || SCHEDULE_TYPE_CFG.unknown;
+    var dur = seg.endMin - seg.startMin;
+    var editable = seg.type === 'unknown' || seg.source === 'manual';
+    var onclick = editable ? ' onclick="handleLegendClick' + suffix + '(\'' + seg.id + '\',\'' + seg.type + '\',' + seg.startMin + ',' + seg.endMin + ',\'' + (seg.label||'').replace(/'/g,"\\'") + '\',\'' + (seg.note||'').replace(/'/g,"\\'") + '\')"' : '';
+    var scoreLabel = '';
+    if (seg.type === 'waste') {
+      scoreLabel = '<span class="legend-score zero">0分</span>';
+    } else if (seg.type === 'study' || seg.type === 'work' || seg.type === 'sport') {
+      scoreLabel = '<span class="legend-score bonus">' + (dur * 2) + '分</span>';
+    } else if (seg.type === 'fun' || seg.type === 'daily' || seg.type === 'sleep') {
+      scoreLabel = '<span class="legend-score base">' + dur + '分</span>';
+    }
+    return '<div class="legend-item ' + seg.type + '"' + onclick + '>' +
+      '<div class="legend-color" style="background:' + cfg.color + '"></div>' +
+      '<span class="legend-time">' + minToTime(seg.startMin) + '-' + minToTime(seg.endMin) + '</span>' +
+      '<span class="legend-label">' + cfg.icon + ' ' + (seg.label || cfg.label) + '</span>' +
+      (seg.note ? '<span class="legend-note">' + seg.note + '</span>' : '') +
+      scoreLabel +
+      '<span class="legend-dur">' + dur + '分钟</span></div>';
+  }).join('');
+}
+
+function refreshStatsSchedule() {
+  var date = today();
+  var schedule = getDaySchedule(date);
+  renderTimelineIn(schedule.segments, 'statsTimelineTrack', 'statsTimelineTicks', '_stats');
+  renderLegendIn(schedule.segments, 'statsTimelineLegend', '_stats');
+  hideSegForm_stats();
+}
+
+function renderTypeLegend() {
+  var types = ['waste','fun','study','work','sport','daily','sleep'];
+  return '<div class="type-legend">' +
+    types.map(function(t) {
+      var cfg = SCHEDULE_TYPE_CFG[t];
+      return '<span class="type-legend-item"><span class="type-legend-dot" style="background:' + cfg.color + '"></span>' + cfg.icon + ' ' + cfg.label + '</span>';
+    }).join('') +
+    '</div>';
+}
+
+// ===== Stats版日程操作函数 =====
+function handleLegendClick_stats(id, type, startMin, endMin, label, note) {
+  if (type === 'unknown') {
+    showAddSegForm_stats(startMin, endMin);
+  } else {
+    showEditSegForm_stats({ id: id, type: type, startMin: startMin, endMin: endMin, label: label, note: note || '' });
+  }
+}
+
+function showAddSegForm_stats(startMin, endMin) {
+  _editingSegId = null;
+  _scheduleDate = today();
+  document.getElementById('statsSegFormTitle').textContent = '添加时段';
+  document.getElementById('statsSegForm').style.display = 'block';
+  document.getElementById('statsDelSegBtn').style.display = 'none';
+  initTypeChipsIn('daily', 'statsSegTypeChips');
+  initTimeSelectsIn(startMin || 0, endMin || 60, 'statsSegStartH', 'statsSegStartM', 'statsSegEndH', 'statsSegEndM');
+  document.getElementById('statsSegLabel').value = '';
+  document.getElementById('statsSegNote').value = '';
+}
+
+function showEditSegForm_stats(seg) {
+  _editingSegId = seg.id;
+  _scheduleDate = today();
+  document.getElementById('statsSegFormTitle').textContent = '编辑时段';
+  document.getElementById('statsSegForm').style.display = 'block';
+  document.getElementById('statsDelSegBtn').style.display = 'inline-block';
+  initTypeChipsIn(seg.type, 'statsSegTypeChips');
+  initTimeSelectsIn(seg.startMin, seg.endMin, 'statsSegStartH', 'statsSegStartM', 'statsSegEndH', 'statsSegEndM');
+  document.getElementById('statsSegLabel').value = seg.label || '';
+  document.getElementById('statsSegNote').value = seg.note || '';
+}
+
+function hideSegForm_stats() {
+  var f = document.getElementById('statsSegForm');
+  if (f) f.style.display = 'none';
+  _editingSegId = null;
+}
+
+function saveSeg_stats() {
+  // 1. 读取表单数据
+  var elSH = document.getElementById('statsSegStartH');
+  var elSM = document.getElementById('statsSegStartM');
+  var elEH = document.getElementById('statsSegEndH');
+  var elEM = document.getElementById('statsSegEndM');
+  if (!elSH || !elSM || !elEH || !elEM) { showToast('表单未就绪，请刷新页面重试'); return; }
+  var sH = parseInt(elSH.value);
+  var sM = parseInt(elSM.value);
+  var eH = parseInt(elEH.value);
+  var eM = parseInt(elEM.value);
+  if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) { showToast('时间值无效:' + sH + ':' + sM + '-' + eH + ':' + eM); return; }
+  var startMin = sH * 60 + sM;
+  var endMin = eH * 60 + eM;
+  if (endMin <= startMin) { showToast('结束时间须晚于开始时间'); return; }
+  var type = _selectedSegType || 'daily';
+  var labelEl = document.getElementById('statsSegLabel');
+  var noteEl = document.getElementById('statsSegNote');
+  var label = labelEl ? (labelEl.value || '').trim() : '';
+  var note = noteEl ? (noteEl.value || '').trim() : '';
+  var saveDate = _scheduleDate || today();
+
+  // 2. 构造数据
+  var schedules = loadScheduleData();
+  var schedule = schedules.find(function(s) { return s.date === saveDate; });
+  if (!schedule) { schedule = { date: saveDate, segments: [] }; schedules.push(schedule); }
+  if (_editingSegId) {
+    var idx = schedule.segments.findIndex(function(s) { return s.id === _editingSegId; });
+    if (idx !== -1) {
+      schedule.segments[idx].startMin = startMin;
+      schedule.segments[idx].endMin = endMin;
+      schedule.segments[idx].type = type;
+      schedule.segments[idx].label = label;
+      schedule.segments[idx].note = note;
+      schedule.segments[idx].source = 'manual';
+    }
+  } else {
+    schedule.segments.push({
+      id: 'seg_' + Date.now(),
+      startMin: startMin,
+      endMin: endMin,
+      type: type,
+      label: label,
+      note: note,
+      source: 'manual'
+    });
+  }
+
+  // 3. 保存到 localStorage
+  saveScheduleData(schedules);
+  _editingSegId = null;
+
+  // 4. 刷新 UI（独立 try，保存成功即算成功）
+  try { hideSegForm_stats(); } catch(e) {}
+  try { refreshStatsSchedule(); } catch(e) { console.error('refreshStatsSchedule error', e); }
+  showToast('✅ 已保存');
+}
+
+function deleteSeg_stats() {
+  if (!_editingSegId) return;
+  var schedules = loadScheduleData();
+  var schedule = schedules.find(function(s) { return s.date === _scheduleDate; });
+  if (schedule) {
+    schedule.segments = schedule.segments.filter(function(s) { return s.id !== _editingSegId; });
+    saveScheduleData(schedules);
+  }
+  refreshStatsSchedule();
+  showToast('已删除');
+}
+
+function initTypeChipsIn(selected, chipsId) {
+  _selectedSegType = selected || 'daily';
+  var el = document.getElementById(chipsId);
+  if (!el) return;
+  var types = ['waste','fun','study','work','sport','daily','sleep'];
+  el.innerHTML = types.map(function(t) {
+    var cfg = SCHEDULE_TYPE_CFG[t];
+    var sel = t === _selectedSegType ? ' selected' : '';
+    return '<span class="type-chip' + sel + '" onclick="selectSegTypeIn(\'' + t + '\',this)">' + cfg.icon + cfg.label + '</span>';
+  }).join('');
+}
+
+function selectSegTypeIn(type, el) {
+  _selectedSegType = type;
+  el.parentNode.querySelectorAll('.type-chip').forEach(function(c) { c.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+
+function initTimeSelectsIn(startMin, endMin, startHId, startMId, endHId, endMId) {
+  var hOpts = ''; for (var h = 0; h <= 24; h++) hOpts += '<option value="'+h+'">'+String(h).padStart(2,'0')+'</option>';
+  var mOpts = ''; for (var m = 0; m < 60; m += 1) mOpts += '<option value="'+m+'">'+String(m).padStart(2,'0')+'</option>';
+  document.getElementById(startHId).innerHTML = hOpts;
+  document.getElementById(startMId).innerHTML = mOpts;
+  document.getElementById(endHId).innerHTML = hOpts;
+  document.getElementById(endMId).innerHTML = mOpts;
+  startMin = startMin || 0; endMin = endMin || 60;
+  document.getElementById(startHId).value = Math.floor(startMin / 60);
+  document.getElementById(startMId).value = startMin % 60;
+  document.getElementById(endHId).value = Math.min(24, Math.floor(endMin / 60));
+  document.getElementById(endMId).value = endMin >= 1440 ? 0 : endMin % 60;
+}
+
+function handleLegendClick(id, type, startMin, endMin, label, note) {
+  if (type === 'unknown') {
+    showAddSegForm(startMin, endMin);
+  } else {
+    showEditSegForm({ id: id, type: type, startMin: startMin, endMin: endMin, label: label, note: note || '' });
+  }
+}
+
+function showAddSegForm(startMin, endMin) {
+  _editingSegId = null;
+  document.getElementById('segFormTitle').textContent = '添加时段';
+  document.getElementById('segForm').style.display = 'block';
+  document.getElementById('delSegBtn').style.display = 'none';
+  initTypeChips('daily');
+  initTimeSelects(startMin || 0, endMin || 60);
+  document.getElementById('segLabel').value = '';
+  document.getElementById('segNote').value = '';
+}
+
+function showEditSegForm(seg) {
+  _editingSegId = seg.id;
+  document.getElementById('segFormTitle').textContent = '编辑时段';
+  document.getElementById('segForm').style.display = 'block';
+  document.getElementById('delSegBtn').style.display = 'inline-block';
+  initTypeChips(seg.type);
+  initTimeSelects(seg.startMin, seg.endMin);
+  document.getElementById('segLabel').value = seg.label || '';
+  document.getElementById('segNote').value = seg.note || '';
+}
+
+function hideSegForm() {
+  document.getElementById('segForm').style.display = 'none';
+  _editingSegId = null;
+}
+
+function initTypeChips(selected) {
+  _selectedSegType = selected || 'daily';
+  var el = document.getElementById('segTypeChips');
+  var types = ['waste','fun','study','work','sport','daily','sleep'];
+  el.innerHTML = types.map(function(t) {
+    var cfg = SCHEDULE_TYPE_CFG[t];
+    var sel = t === _selectedSegType ? ' selected' : '';
+    return '<span class="type-chip' + sel + '" onclick="selectSegType(\'' + t + '\',this)">' + cfg.icon + cfg.label + '</span>';
+  }).join('');
+}
+
+function selectSegType(type, el) {
+  _selectedSegType = type;
+  document.querySelectorAll('#segTypeChips .type-chip').forEach(function(c) { c.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+
+function initTimeSelects(startMin, endMin) {
+  var hOpts = ''; for (var h = 0; h <= 24; h++) hOpts += '<option value="'+h+'">'+String(h).padStart(2,'0')+'</option>';
+  var mOpts = ''; for (var m = 0; m < 60; m += 1) mOpts += '<option value="'+m+'">'+String(m).padStart(2,'0')+'</option>';
+  document.getElementById('segStartH').innerHTML = hOpts;
+  document.getElementById('segStartM').innerHTML = mOpts;
+  document.getElementById('segEndH').innerHTML = hOpts;
+  document.getElementById('segEndM').innerHTML = mOpts;
+  startMin = startMin || 0; endMin = endMin || 60;
+  document.getElementById('segStartH').value = Math.floor(startMin / 60);
+  document.getElementById('segStartM').value = startMin % 60;
+  document.getElementById('segEndH').value = Math.min(24, Math.floor(endMin / 60));
+  document.getElementById('segEndM').value = endMin >= 1440 ? 0 : endMin % 60;
+}
+
+function saveSeg() {
+  var elSH = document.getElementById('segStartH');
+  var elSM = document.getElementById('segStartM');
+  var elEH = document.getElementById('segEndH');
+  var elEM = document.getElementById('segEndM');
+  if (!elSH || !elSM || !elEH || !elEM) { showToast('表单未就绪，请刷新页面重试'); return; }
+  var sH = parseInt(elSH.value);
+  var sM = parseInt(elSM.value);
+  var eH = parseInt(elEH.value);
+  var eM = parseInt(elEM.value);
+  if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) { showToast('时间值无效:' + sH + ':' + sM + '-' + eH + ':' + eM); return; }
+  var startMin = sH * 60 + sM;
+  var endMin = eH * 60 + eM;
+  if (endMin <= startMin) { showToast('结束时间须晚于开始时间'); return; }
+  if (endMin - startMin < 1) { showToast('时段至少1分钟'); return; }
+  var type = _selectedSegType || 'daily';
+  var labelEl = document.getElementById('segLabel');
+  var noteEl = document.getElementById('segNote');
+  var label = labelEl ? (labelEl.value || '').trim() : '';
+  var note = noteEl ? (noteEl.value || '').trim() : '';
+  var saveDate = _scheduleDate || today();
+
+  var schedules = loadScheduleData();
+  var schedule = schedules.find(function(s) { return s.date === saveDate; });
+  if (!schedule) { schedule = { date: saveDate, segments: [] }; schedules.push(schedule); }
+
+  if (_editingSegId) {
+    var idx = schedule.segments.findIndex(function(s) { return s.id === _editingSegId; });
+    if (idx !== -1) {
+      schedule.segments[idx].startMin = startMin;
+      schedule.segments[idx].endMin = endMin;
+      schedule.segments[idx].type = type;
+      schedule.segments[idx].label = label;
+      schedule.segments[idx].note = note;
+      schedule.segments[idx].source = 'manual';
+    }
+  } else {
+    schedule.segments.push({
+      id: 'seg_' + Date.now(),
+      startMin: startMin,
+      endMin: endMin,
+      type: type,
+      label: label,
+      note: note,
+      source: 'manual'
+    });
+  }
+  saveScheduleData(schedules);
+  _editingSegId = null;
+
+  try { hideSegForm(); } catch(e) {}
+  try {
+    var updated = getDaySchedule(saveDate);
+    renderTimeline(updated.segments);
+    renderLegend(updated.segments);
+    if (saveDate === today()) refreshStatsSchedule();
+  } catch(e) { console.error('renderAfterSave error', e); }
+  showToast('✅ 已保存');
+}
+
+function deleteSeg() {
+  if (!_editingSegId) return;
+  var schedules = loadScheduleData();
+  var schedule = schedules.find(function(s) { return s.date === _scheduleDate; });
+  if (schedule) {
+    schedule.segments = schedule.segments.filter(function(s) { return s.id !== _editingSegId; });
+    saveScheduleData(schedules);
+  }
+  hideSegForm();
+  var updated = getDaySchedule(_scheduleDate);
+  renderTimeline(updated.segments);
+  renderLegend(updated.segments);
+  // 如果删除的是今日日程，同步刷新今日tab的内嵌日程
+  if (_scheduleDate === today()) refreshStatsSchedule();
+  showToast('已删除');
 }
 
 // ===== MANUAL SLEEP MODAL =====
@@ -4009,6 +5242,239 @@ function deleteSleepRecord(idx) {
   showToast('🗑️ 已删除睡眠记录');
 }
 
+// ========== 格言警句功能 ==========
+var INITIAL_QUOTES = [
+  {text: "1.没有急事就不打语音不打视频，留个言就可以了。2.尽可能把时间和精力放在真正重要的事情上。"},
+  {text: "控制购物时间，限制在10分钟以内，你的时间比金钱更加宝贵。"},
+  {text: "不批评自己，多鼓励自己，告诉自己我有多棒。(例:天天嫌弃自己不自律，可是这个不自律的人，累计跑量已经有1500多公里了)"},
+  {text: "每个人都有自己的局限性。有点小缺点小毛病是再正常不过的事情。对自己有耐心一小步一小步地去改正。"},
+  {text: "多进行走神→拉回练习"},
+  {text: "使用电子产品前，写下自己要干什么。"},
+  {text: "直面痛苦和困难，仔细品味这种感受，不逃避。"},
+  {text: "户外跑步对保护眼睛很有好处，哪怕是晚上跑。跑完以后感觉眼睛很湿润，看东西感觉更清晰了。"},
+  {text: "闹钟一响就起床。做一个雷厉风行的人。", scene: "morning"},
+  {text: "希望获得谁的认可，就被谁控制。我不想再获得其他人的认可。我想获得自己对自己的认可。"},
+  {text: "学习时，尽可能地加入自己的思考和理解。"},
+  {text: "怎么拆分一个句子? 1.属于五大基本句型中的哪一类? 2.句子的各部分在句子中，分别作为什么结构? (比如，在\"The ethical judgments of the Supreme Court justices have become an important issue recently.\"这个句子中，\"The ethical judgments\"作主语，\"of the Supreme Court justices\"作主语\"The ethical judgments\"的后置定语，\"have become\"作动词，\"an important issue\"作补语，\"recently\"作状语。 3.句子的时态是什么? 4.句子中有哪些可以积累的词组? 5.句子中生词的词根词缀是什么? 6.把句子翻译成中文，再对照中文翻译成英文，进行中英互译。"},
+  {text: "1.想要早睡，关键是17:30~22:30这5个小时怎么过。 2.抓紧时间工作，不加班。到点赶紧去运动。 3.运动后迅速吃晚饭、洗澡。 4.20:40~21:40学习。让身体平静下来。 5.确保22:30~23:00这个时间段躺在床上，放空大脑，专注于呼吸，闭目养神，休息。如果23:00还没睡着，起来学习，不要做其他的。学到困得睁不开眼再睡，但不晚于前一天入睡时间或近7天平均入睡时间(困得话以较早一个为准，不困得话以较晚一个为准)。 6.我觉得我是睡得着的，只是有时候作息不规律，有时候喝多了咖啡，根据以往的经验，大概一周之内能调整过来。"},
+  {text: "作息规律化。 每天都按相同的作息时间睡觉、起床、学习、工作、饮食、运动等。 不能因为自己状态不好选择不做，这样只会陷入恶性循环。 不管状态怎么样，该干什么干什么。"},
+  {text: "每天最重要的两件事:1.学习5分钟C语言;2.早睡。 其他的事情都可以放一放。"},
+  {text: "其他人的言语，或者态度，反映了他的某种目的，比如: 1.发泄情绪: 2.试图恶意攻击并达到削弱你的目的; 3.试图沟通并达到某种诉求等等。 处理方式: 1.直接无视，你的时间和精力非常宝贵，要放在重要的事情上。 2.听取建议，行为上要改进，如果是不太容易纠正的陋习，最好做个记录，逐步完善。 3.不管说什么，做什么，都要注意，你的目标是什么，诉求是什么。你做出的这些言行想要达到的目标是什么，诉求是什么。你是想让对方改变想法?想让对方改变行为?或者你的话主要目的不是对着对方说，而是让其他人听到看到?"},
+  {text: "\"一个意外的收获: 在学习这份报告的过程中，我对恶意和差评有了全新的理解。过去我对莫名其妙的恶意，态度是\"不听不看不回应\"，用无视来\"饿死\"恶意。 这个态度让我活得很轻松。但是，这当然也让我回避差评。心态上还是消极的。 最近，我突然像被佛祖推着肩膀换了一个角度: 如果站在对方那一边 当他无论出于什么动机发出负面信息时，他得到了什么? 也许是情绪压力的释放?也许是一种\"我比你高明\"的感觉? 假设真的如此，那么，我和我的内容，是不是在某种意义上帮到了他? 想到这里，咦 突然感到功德池里的水，荡漾起来了呢。 从此，不仅不畏惧不回避了，反而还有点窃喜。\""},
+  {text: "围绕睡眠、运动、饮食、工作、学习这5个方面生活，其他能减则减。做减法不做加法。"},
+  {text: "把生活中的事情变成小关卡和小挑战，使之具有趣味性。"},
+  {text: "专注:一次只做一件事"},
+  {text: "关注已经做到的部分"},
+  {text: "项目是否一定成功，是不可控的;在项目推进过程中学到更多的东西，是可控的。 升职加薪必然有你，是不可控的;将来你能在市场上找到更好的机会，是可控的。 上级是否对你有偏见，是不可控的;让周围的人普遍认可你的人品，是可控的。 周围同事水平高低,是不可控的;单位用人优先想到你有领导力,是可控的。 你我都知道，一个具体的难题什么时候发生，是不可控的。但提前学习解决问题的方法，是完全可控的。"},
+  {text: "抄抄写写可以使自己内心平静"},
+  {text: "品尝并感受当下的这种感觉"},
+  {text: "靠大目标给自己带来成就感和掌控感是不行的,靠小目标带来成就感和掌控感。 多给自己来点1分钟或者几分钟就能完成的小目标，通过这种方式获得成就感和掌控感。"},
+  {text: "不八卦，八卦非常浪费时间。"},
+  {text: "觉察到走神却拉不回来，是因为\"觉察\"和\"行动\"之间缺了一座\"低能耗\"的桥。 复位策略:最小启动 问自己:\"接下来30秒，我能做的最小动作是什么?\" x\"我要继续写报告。\"(压力大) √\"我打开文档，把光标移到下一行。\"(可执行) 先做这个\"小到不可能失败\"的动作，而不是直接面对任务。 我注意到注意力飘走了，现在带它回来。"},
+  {text: "当计划中断时:1.根据突发事件占用的时长，相应推后原计划(提前预留缓冲时间);2.抄1句《共产党宣言》收心。"},
+  {text: "有些小挫折小坎坷是非常正常的。就是在不断踩坑中不断改进呀。 这次犯错了，记下来，想想下回怎么改正过来。 又不是杀人放火的错误，没啥大不了的， 这次不行下次换个姿势再试试呗。"},
+  {text: "当下这一分钟，快快乐乐地、充满成就感地过。"},
+  {text: "微目标收心"},
+  {text: "达不到标准就降低标准。如果我一开始跑步的时候就给自己定6分配的目标，一定会把自己吓趴，然后就不跑了。 步子尽可能小一点，能轻而易举完成的时候再加大。不要一下子把步子迈太大。 不苛责，多鼓励，转换思维模式，多往好的方面想。"},
+  {text: "凡事发生皆有利于我"},
+  {text: "1.不主动找别人; 2.不说话或者尽量少说话; 3.言多必失，只在必要的时候说话，不必要的时候什么也别说; 4.闲聊非常浪费时间，你的时间要用来做更重要的事。"},
+  {text: "1.想想《我为你洒下月光》中的群，她是如何在混乱的环境中学习的。 2.掌握快速切换的能力，提高时间的利用率。 3.抗干扰能力在锻炼中提升。"},
+  {text: "建立\"复位庆祝\"(针对干扰) 动作:每次被干扰后成功回到任务，对自己说一句\"漂亮，又回来了!\"(甚至可以打个勾)。 原理:把\"被干扰-复位\"这个原本让你烦躁的过程，变成一种可被奖励的积极行为。\" 锻炼自己快速收心的能力"},
+  {text: "达不到理想状态没关系，只需靠近理想状态。"},
+  {text: "想玩乐的时候告诉自己:最痛苦的不是失败，而是我本可以。"},
+  {text: "如果想娱乐一下的话，要提前安排时间。 不占用睡眠时间娱乐，睡眠是排在第一位的。"},
+  {text: "如果学习时间达不到预期也没关系，可以用周末或者节假日补充。"},
+  {text: "要留有余地，不要把时间弄得太紧，少而精。"},
+  {text: "不要急不要慌，太阳下山有月光。 事情最终都能得到解决的。"},
+  {text: "想逃避不知道干什么的时候，就抄抄书吧"},
+  {text: "边学边干，很快乐"},
+  {text: "最重要的事情，只有一件。"},
+  {text: "感到疲惫、焦虑、不想动的时候，告诉自己:我是共和国的钢铁战士。"},
+  {text: "胜不妄喜，败不惶馁。胸有激雷而面如平湖者，可拜上将军。"},
+  {text: "这没什么的，后果我完全承担得起。"},
+  {text: "把要做什么写下来，然后一件件去做，这样思路清晰一些。"},
+  {text: "过好当下的每一分每一秒，不去想过去，也不去想未来，只想想当下这一分这一秒的自己，是不是自己真正想要的样子，是不是自己想成为的人。"},
+  {text: "你的惰性压倒了你积极上进的一面，而你并不喜欢这样躺平摆烂的自己，所以你才会焦虑、抑郁，我希望你的积极上进的一面可以压倒懒惰的一面，成为你真正认可的自己。"},
+  {text: "把时间和精力放在自己喜欢和值得的事情上，不放在不值得不重要的事情上。"},
+  {text: "睡眠是高效的基石。到了点，不论做没做完，必须休息。22:30~23:00必须躺在床上。可以听听冥想相关的书籍。"},
+  {text: "一件事情你把它当个事它就好像是个蛮重要的事，你不把它当个事就啥子也不是。"},
+  {text: "不试图解决问题。带着问题睡觉。22:30前想起来的问题或体会可以记录下来，22:30后想起来的就忘了吧。"},
+  {text: "宁要高效的6个小时，不要拖拉的12个小时。"},
+  {text: "人无完人，金无足赤。不要老是责备自己，对自己好一点。遇事都想好的一面。"},
+  {text: "将军赶路，不追小兔。生活中鸡毛蒜皮的事多得很，什么都去在意只会什么都干不成。抓核心。"},
+  {text: "如果你内心所有欲望都能做到不依赖自己以外的任何人，那你便是自己的主人，也将因此获得真正的自由。斯多葛学派的哲学就是让你掌控自己的人生，懂得在自己有能力完成或改变的事情上下功夫，而不要在无能为力的事情上浪费精力。"},
+  {text: "斯多葛学派尤其警告我们不要对无法控制的事情做出情绪化的反应。伊壁鸠鲁认为，让我们沮丧的往往不是所处的环境，而是我们对它们所做的判断，比如愤怒就是如此:如果下雨破坏了我们的野餐，我们不应感到愤怒，那是非常愚蠢的做法，因为我们对雨无能为力。如果有人苛待我们，我们往往也会生气，但是要知道，就像无法把雨赶走一样，我们也不能控制或改变苛待我们的人，所以生气同样很愚蠢。"},
+  {text: "总之，把自己的幸福感受寄托在对他人行为的改变上，与将其寄托在天气上没有什么区别，注定毫无结果。伊壁鸠鲁在书中写道:\" 如果有任何我们控制不了的事情，你就要想它与你毫无关系。\""},
+  {text: "\"接受\"是斯多葛学派提出的核心方法:如果你接受了可能发生的\"最坏\"情况，而且只关注自己能做什么，并以积极的方式应对，你就能减少很多情绪上的痛苦。如此一来，情绪带给你的便是激励和力量，而不会将你摧毁。"},
+  {text: "我生来就是高山而非溪流，我欲于群峰之巅俯视平庸的沟壑。我生来就是人杰而非草芥，我站在伟人之肩藐视卑微的懦夫。"},
+  {text: "金屑虽贵，落眼成翳。"},
+  {text: "本自无缚，不用求解。"},
+  {text: "一切具足，更无欠少，使用自在，何假外求?"},
+  {text: "学习时，尽可能把输入变成输出。 尽可能把所有感官都调动，而不仅仅是眼睛看。 手要写，脑子要思考，耳朵要听，嘴巴要念。"},
+  {text: "上天想给你最好礼物的时候，会先让你腾空双手。"},
+  {text: "放松点。生活不会因为你心弦紧绷,而事事顺遂。"},
+  {text: "与人交往，要做好两个前提准备:一是要坚信对方是好人，二是要明了对方是凡人。是好人，就必然有向善、行善的需求;是凡人，他的情绪和意识就必然有善变、不稳定的一面。在这两个前提下与人交往，必然会超脱和豁达，也会更具备与人方便的能力。"}
+];
+
+function getMonday(date) {
+  var d = new Date(date);
+  var day = d.getDay();
+  var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+function getQuotesData() {
+  try {
+    var raw = localStorage.getItem('codex_quotes_v1');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { quotes: [] };
+}
+
+function saveQuotesData(data) {
+  localStorage.setItem('codex_quotes_v1', JSON.stringify(data));
+}
+
+var QUOTES_VERSION = 4; // 格言版本号，更新内容时递增
+
+function initQuotesIfEmpty() {
+  var data = getQuotesData();
+  if (!data.quotes) data.quotes = [];
+  // 首次使用 或 内置版本号 > 已存版本号 时，用内置数据重置
+  var storedVer = data.version || 0;
+  if (typeof INITIAL_QUOTES !== 'undefined' && (data.quotes.length === 0 || storedVer < QUOTES_VERSION)) {
+    data.quotes = [];
+    INITIAL_QUOTES.forEach(function(q) {
+      var obj = { text: q.text, lastShownWeek: null };
+      if (q.scene) obj.scene = q.scene;
+      data.quotes.push(obj);
+    });
+    data.version = QUOTES_VERSION;
+    saveQuotesData(data);
+  }
+  return data;
+}
+
+function getAvailableQuote(scene) {
+  var data = getQuotesData();
+  if (!data.quotes || data.quotes.length === 0) return null;
+  var weekKey = getMonday(new Date());
+  // 按场景过滤：scene="morning"时排除scene="evening"的，scene="evening"时排除scene="morning"的
+  var pool = data.quotes.filter(function(q) {
+    if (scene && q.scene && q.scene !== scene) return false;
+    return true;
+  });
+  if (pool.length === 0) pool = data.quotes; // 兜底
+  var available = pool.filter(function(q) {
+    return q.lastShownWeek !== weekKey;
+  });
+  if (available.length === 0) {
+    pool.forEach(function(q) { q.lastShownWeek = null; });
+    saveQuotesData(data);
+    available = pool;
+  }
+  var pick = available[Math.floor(Math.random() * available.length)];
+  var idx = data.quotes.indexOf(pick);
+  data.quotes[idx].lastShownWeek = weekKey;
+  saveQuotesData(data);
+  return pick.text;
+}
+
+var _currentQuoteScene = null;
+
+function showQuoteModal(scene) {
+  _currentQuoteScene = scene || null;
+  var text = getAvailableQuote(scene);
+  var overlay = document.getElementById('quoteOverlay');
+  var textEl = document.getElementById('quoteText');
+  if (!text) {
+    textEl.textContent = '格言库暂无内容，请在「规则」页添加格言警句。';
+  } else {
+    textEl.textContent = text;
+  }
+  overlay.style.display = 'flex';
+}
+
+function closeQuoteModal() {
+  document.getElementById('quoteOverlay').style.display = 'none';
+}
+
+function showAnotherQuote() {
+  var text = getAvailableQuote(_currentQuoteScene);
+  var textEl = document.getElementById('quoteText');
+  if (!text) {
+    textEl.textContent = '格言库暂无内容，请在「规则」页添加格言警句。';
+  } else {
+    textEl.textContent = text;
+  }
+}
+
+function addQuoteToLibrary(text) {
+  if (!text || !text.trim()) return false;
+  var data = getQuotesData();
+  if (!data.quotes) data.quotes = [];
+  data.quotes.push({ text: text.trim(), lastShownWeek: null });
+  saveQuotesData(data);
+  return true;
+}
+
+function deleteQuoteFromLibrary(idx) {
+  var data = getQuotesData();
+  if (!data.quotes || idx < 0 || idx >= data.quotes.length) return;
+  data.quotes.splice(idx, 1);
+  saveQuotesData(data);
+}
+
+function renderQuoteManage() {
+  var container = document.getElementById('quoteManageList');
+  var countEl = document.getElementById('quoteCount');
+  if (!container) return;
+  var data = getQuotesData();
+  var quotes = data.quotes || [];
+  if (countEl) countEl.textContent = '当前共 ' + quotes.length + ' 句格言';
+  if (quotes.length === 0) {
+    container.innerHTML = '<div class="quote-empty">格言库为空，请在下方输入框中添加。</div>';
+    return;
+  }
+  var html = '';
+  quotes.forEach(function(q, i) {
+    var displayNum = '句' + (i + 1);
+    html += '<div class="quote-manage-item">' +
+      '<span class="q-index">' + displayNum + '</span>' +
+      '<span class="q-text">' + escapeHtml(q.text) + '</span>' +
+      '<button class="q-del" onclick="doDeleteQuote(' + i + ')" title="删除">🗑️</button>' +
+      '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function doDeleteQuote(idx) {
+  if (!confirm('确定删除该句格言吗？')) return;
+  deleteQuoteFromLibrary(idx);
+  renderQuoteManage();
+  showToast('已删除');
+}
+
+function submitNewQuote() {
+  var input = document.getElementById('newQuoteInput');
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) { showToast('请输入格言内容'); return; }
+  var ok = addQuoteToLibrary(text);
+  if (ok) {
+    input.value = '';
+    renderQuoteManage();
+    showToast('已添加：' + text.slice(0, 20) + (text.length > 20 ? '…' : ''));
+  }
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
 </script>
 </body>
 </html>
