@@ -3986,7 +3986,7 @@ function getSleepMinutesForDate(logs, targetDate) {
         results.push({
           sleepH: l.sleepH, sleepM: l.sleepM,
           wakeH: 0, wakeM: 0,
-          dur: beforeMidnight, coins: 0,
+          dur: beforeMidnight, coins: l.coins || 0,
           isCrossDay: true, crossPart: 'before'
         });
       }
@@ -3994,7 +3994,7 @@ function getSleepMinutesForDate(logs, targetDate) {
         results.push({
           sleepH: 0, wakeH: l.wakeH,
           sleepM: 0, wakeM: l.wakeM,
-          dur: afterMidnight, coins: l.coins || 0,
+          dur: afterMidnight, coins: 0,
           isCrossDay: true, crossPart: 'after'
         });
       }
