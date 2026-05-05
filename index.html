@@ -2973,10 +2973,44 @@ function renderStats() {
   }
 
   // 日程时间轴卡片（始终显示）
+  // 计算各类型已记录时长汇总
+  var segSummary = {};
+  schedule.segments.forEach(function(seg) {
+    if (seg.type === 'unknown') return;
+    var dur = seg.endMin - seg.startMin;
+    segSummary[seg.type] = (segSummary[seg.type] || 0) + dur;
+  });
+  var totalRecorded = 0;
+  Object.values(segSummary).forEach(function(v) { totalRecorded += v; });
+  var summaryTypes = [
+    { key: 'waste', label: '浪费', color: '#e94560', icon: '📵' },
+    { key: 'fun', label: '娱乐', color: '#9b59b6', icon: '🎮' },
+    { key: 'study', label: '学习', color: '#4caf50', icon: '📚' },
+    { key: 'work', label: '工作', color: '#5b8cff', icon: '💼' },
+    { key: 'sport', label: '运动', color: '#55efc4', icon: '🏃' },
+    { key: 'daily', label: '日常', color: '#f5a623', icon: '🏠' },
+    { key: 'sleep', label: '睡眠', color: '#7c73e6', icon: '🌙' }
+  ];
+  var summaryHtml = '<div id="statsSegSummary" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:8px 0 4px;font-size:13px;">';
+  summaryTypes.forEach(function(t) {
+    var mins = segSummary[t.key] || 0;
+    var h = Math.floor(mins / 60), m = mins % 60;
+    var timeStr = h > 0 ? h + 'h' + (m > 0 ? m + 'm' : '') : m + 'm';
+    summaryHtml += '<span style="color:' + t.color + ';white-space:nowrap;">' + t.icon + ' ' + t.label + ' <b>' + timeStr + '</b></span>';
+  });
+  var totalH = Math.floor(totalRecorded / 60), totalM = totalRecorded % 60;
+  var totalStr = totalH > 0 ? totalH + 'h' + (totalM > 0 ? totalM + 'm' : '') : totalM + 'm';
+  var remainMin = Math.max(0, 1440 - totalRecorded);
+  var remainH = Math.floor(remainMin / 60), remainM = remainMin % 60;
+  var remainStr = remainH > 0 ? remainH + 'h' + (remainM > 0 ? remainM + 'm' : '') : remainM + 'm';
+  summaryHtml += '<span style="color:var(--muted);white-space:nowrap;">合计 <b>' + totalStr + '</b></span>';
+  summaryHtml += '<span style="color:#888;white-space:nowrap;">未填 <b>' + remainStr + '</b></span>';
+  summaryHtml += '</div>';
+
   var scheduleCard = `
     <div class="card">
       <div class="card-title"><span class="icon">📅</span>今日日程时间轴</div>
-      <div class="type-legend"><span class="type-legend-item"><span class="type-legend-dot" style="background:#e94560"></span>📵 浪费</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#9b59b6"></span>🎮 娱乐</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#4caf50"></span>📚 学习</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#5b8cff"></span>💼 工作</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#55efc4"></span>🏃 运动</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#f5a623"></span>🏠 日常</span><span class="type-legend-item"><span class="type-legend-dot" style="background:#2a2a4a;border:1px solid #555"></span>🌙 睡眠</span></div>
+      ${summaryHtml}
       <div class="timeline-container">
         <div class="timeline-track" id="statsTimelineTrack"></div>
         <div class="timeline-ticks" id="statsTimelineTicks"></div>
@@ -4833,7 +4867,45 @@ function refreshStatsSchedule() {
   var schedule = getDaySchedule(date);
   renderTimelineIn(schedule.segments, 'statsTimelineTrack', 'statsTimelineTicks', '_stats');
   renderLegendIn(schedule.segments, 'statsTimelineLegend', '_stats');
+  updateSegSummary(schedule.segments);
   hideSegForm_stats();
+}
+
+function updateSegSummary(segments) {
+  var el = document.getElementById('statsSegSummary');
+  if (!el) return;
+  var segSummary = {};
+  segments.forEach(function(seg) {
+    if (seg.type === 'unknown') return;
+    var dur = seg.endMin - seg.startMin;
+    segSummary[seg.type] = (segSummary[seg.type] || 0) + dur;
+  });
+  var totalRecorded = 0;
+  Object.values(segSummary).forEach(function(v) { totalRecorded += v; });
+  var summaryTypes = [
+    { key: 'waste', label: '浪费', color: '#e94560', icon: '📵' },
+    { key: 'fun', label: '娱乐', color: '#9b59b6', icon: '🎮' },
+    { key: 'study', label: '学习', color: '#4caf50', icon: '📚' },
+    { key: 'work', label: '工作', color: '#5b8cff', icon: '💼' },
+    { key: 'sport', label: '运动', color: '#55efc4', icon: '🏃' },
+    { key: 'daily', label: '日常', color: '#f5a623', icon: '🏠' },
+    { key: 'sleep', label: '睡眠', color: '#7c73e6', icon: '🌙' }
+  ];
+  var html = '';
+  summaryTypes.forEach(function(t) {
+    var mins = segSummary[t.key] || 0;
+    var h = Math.floor(mins / 60), m = mins % 60;
+    var timeStr = h > 0 ? h + 'h' + (m > 0 ? m + 'm' : '') : m + 'm';
+    html += '<span style="color:' + t.color + ';white-space:nowrap;">' + t.icon + ' ' + t.label + ' <b>' + timeStr + '</b></span>';
+  });
+  var totalH = Math.floor(totalRecorded / 60), totalM = totalRecorded % 60;
+  var totalStr = totalH > 0 ? totalH + 'h' + (totalM > 0 ? totalM + 'm' : '') : totalM + 'm';
+  var remainMin = Math.max(0, 1440 - totalRecorded);
+  var remainH = Math.floor(remainMin / 60), remainM = remainMin % 60;
+  var remainStr = remainH > 0 ? remainH + 'h' + (remainM > 0 ? remainM + 'm' : '') : remainM + 'm';
+  html += '<span style="color:var(--muted);white-space:nowrap;">合计 <b>' + totalStr + '</b></span>';
+  html += '<span style="color:#888;white-space:nowrap;">未填 <b>' + remainStr + '</b></span>';
+  el.innerHTML = html;
 }
 
 function renderTypeLegend() {
