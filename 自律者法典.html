@@ -3570,8 +3570,18 @@ function syncFromSchedule() {
     else if (seg.type === 'waste') wasteM += dur;
     else if (seg.type === 'fun') funM += dur;
     else if (seg.type === 'daily') dailyM += dur;
-    // sleep 不计入打卡字段
+    // sleep：从日程睡眠时段提取入睡时间
   });
+
+  // 从日程睡眠时段同步入睡时间
+  var sleepSegs = segs.filter(function(seg) { return seg.type === 'sleep'; });
+  if (sleepSegs.length > 0) {
+    var firstSleep = sleepSegs[0];
+    var bedHour = Math.floor(firstSleep.startMin / 60) % 24;
+    var bedMin  = firstSleep.startMin % 60;
+    document.getElementById('sleepHour').value   = bedHour;
+    document.getElementById('sleepMinute').value = bedMin;
+  }
 
   document.getElementById('studyMin').value = studyM;
   document.getElementById('workMin').value = workM;
@@ -3954,6 +3964,44 @@ function refreshSleepDuration() {
   var logs = loadSleepLog();
   var todayLogs = logs.filter(function(l) { return l.date === today(); });
   if (todayLogs.length === 0) {
+    // 兜底：尝试从今日日程的睡眠时段读取
+    var schedule = getDaySchedule(today());
+    var sleepSegs = (schedule.segments || []).filter(function(seg) { return seg.type === 'sleep'; });
+    if (sleepSegs.length > 0) {
+      var totalDur = 0;
+      sleepSegs.forEach(function(seg) { totalDur += (seg.endMin - seg.startMin); });
+      var hrs = Math.floor(totalDur / 60);
+      var mins = totalDur % 60;
+      var durStr = hrs > 0 ? (hrs + '小时' + (mins > 0 ? mins + '分钟' : '')) : (mins + '分钟');
+      var quality = '';
+      if (totalDur >= 420) quality = '<span style="color:var(--green);">充足</span>';
+      else if (totalDur >= 360) quality = '<span style="color:var(--gold);">适中</span>';
+      else if (totalDur >= 300) quality = '<span style="color:#e67e22;">不足</span>';
+      else quality = '<span style="color:var(--accent);">严重不足</span>';
+      var detailsHtml = '';
+      sleepSegs.forEach(function(seg, i) {
+        var sh = Math.floor(seg.startMin / 60) % 24;
+        var sm = seg.startMin % 60;
+        var eh = Math.floor(seg.endMin / 60) % 24;
+        var em = seg.endMin % 60;
+        var segDur = seg.endMin - seg.startMin;
+        var dHrs = Math.floor(segDur / 60);
+        var dMins = segDur % 60;
+        var dStr = dHrs > 0 ? (dHrs + 'h' + (dMins > 0 ? dMins + 'm' : '')) : (dMins + 'm');
+        detailsHtml += '<div style="display:flex; gap:12px; font-size:12px; color:var(--muted);' + (i > 0 ? ' margin-top:6px;' : '') + '">' +
+          '<span>😴 ' + String(sh).padStart(2,'0') + ':' + String(sm).padStart(2,'0') + '</span>' +
+          '<span>⏰ ' + String(eh).padStart(2,'0') + ':' + String(em).padStart(2,'0') + '</span>' +
+          '<span style="color:var(--text);">' + dStr + '</span>' +
+        '</div>';
+      });
+      el.innerHTML =
+        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+          '<span style="font-size:22px; font-weight:700; color:var(--text);">' + durStr + '</span>' +
+          '<span style="font-size:12px;">睡眠质量：' + quality + ' <small>(来自日程)</small></span>' +
+        '</div>' +
+        detailsHtml;
+      return;
+    }
     el.innerHTML = '<div style="text-align:center; padding:8px 0; color:var(--muted);">暂无今日睡眠记录</div>';
     return;
   }
