@@ -3958,14 +3958,71 @@ function updateSleepView() {
 }
 
 // ========== 打卡页睡眠时长显示 ==========
+// 睡眠跨天拆分规则：入睡日 22:30~24:00 计入入睡日，起床日 00:00~07:30 计入起床日
+function getSleepMinutesForDate(logs, targetDate) {
+  // 返回 [{ sleepH, sleepM, wakeH, wakeM, dur, coins, isCrossDay, crossPart }]
+  var results = [];
+  logs.forEach(function(l) {
+    var sleepMin = l.sleepH * 60 + l.sleepM;
+    var wakeMin  = (l.wakeH != null ? l.wakeH * 60 + (l.wakeM || 0) : -1);
+    var isCrossDay = wakeMin >= 0 && sleepMin >= 18 * 60 && wakeMin < sleepMin;
+    if (!isCrossDay) {
+      // 不跨天：整条记录属于 l.date
+      if (l.date === targetDate) {
+        results.push({
+          sleepH: l.sleepH, sleepM: l.sleepM,
+          wakeH: l.wakeH, wakeM: l.wakeM,
+          dur: l.durationMin || 0, coins: l.coins || 0,
+          isCrossDay: false, crossPart: null
+        });
+      }
+    } else {
+      // 跨天：入睡到24:00归入睡日，00:00到起床归起床日(l.date)
+      var beforeMidnight = 1440 - sleepMin; // 入睡→24:00
+      var afterMidnight  = wakeMin;         // 00:00→起床
+      // 入睡日期：l.date 的前一天
+      var sleepDate = dayBefore(l.date);
+      if (sleepDate === targetDate) {
+        results.push({
+          sleepH: l.sleepH, sleepM: l.sleepM,
+          wakeH: 0, wakeM: 0,
+          dur: beforeMidnight, coins: 0,
+          isCrossDay: true, crossPart: 'before'
+        });
+      }
+      if (l.date === targetDate) {
+        results.push({
+          sleepH: 0, wakeH: l.wakeH,
+          sleepM: 0, wakeM: l.wakeM,
+          dur: afterMidnight, coins: l.coins || 0,
+          isCrossDay: true, crossPart: 'after'
+        });
+      }
+    }
+  });
+  return results;
+}
+
+function dayBefore(dateStr) {
+  // '2026-05-05' → '2026-05-04'
+  var d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + dd;
+}
+
 function refreshSleepDuration() {
   var el = document.getElementById('sleepDurationContent');
   if (!el) return;
   var logs = loadSleepLog();
-  var todayLogs = logs.filter(function(l) { return l.date === today(); });
-  if (todayLogs.length === 0) {
+  var targetDate = today();
+  var sleepItems = getSleepMinutesForDate(logs, targetDate);
+
+  if (sleepItems.length === 0) {
     // 兜底：尝试从今日日程的睡眠时段读取
-    var schedule = getDaySchedule(today());
+    var schedule = getDaySchedule(targetDate);
     var sleepSegs = (schedule.segments || []).filter(function(seg) { return seg.type === 'sleep'; });
     if (sleepSegs.length > 0) {
       var totalDur = 0;
@@ -4005,34 +4062,38 @@ function refreshSleepDuration() {
     el.innerHTML = '<div style="text-align:center; padding:8px 0; color:var(--muted);">暂无今日睡眠记录</div>';
     return;
   }
+
   var totalDur = 0;
   var totalCoins = 0;
-  todayLogs.forEach(function(l) {
-    totalDur += (l.durationMin || 0);
-    totalCoins += (l.coins || 0);
+  sleepItems.forEach(function(item) {
+    totalDur += item.dur;
+    totalCoins += item.coins;
   });
   var hrs = Math.floor(totalDur / 60);
   var mins = totalDur % 60;
   var durStr = hrs > 0 ? (hrs + '小时' + (mins > 0 ? mins + '分钟' : '')) : (mins + '分钟');
-  // 睡眠质量评估（基于总时长）
+  // 睡眠质量评估
   var quality = '';
   if (totalDur >= 420) quality = '<span style="color:var(--green);">充足</span>';
   else if (totalDur >= 360) quality = '<span style="color:var(--gold);">适中</span>';
   else if (totalDur >= 300) quality = '<span style="color:#e67e22;">不足</span>';
   else quality = '<span style="color:var(--accent);">严重不足</span>';
-  // 构建每条记录的详情
+  // 构建每条记录详情
   var detailsHtml = '';
-  todayLogs.forEach(function(l, i) {
-    var sleepTimeStr = String(l.sleepH).padStart(2,'0') + ':' + String(l.sleepM).padStart(2,'0');
-    var wakeTimeStr = l.wakeH != null ? (String(l.wakeH).padStart(2,'0') + ':' + String(l.wakeM).padStart(2,'0')) : '—';
-    var lHrs = Math.floor((l.durationMin || 0) / 60);
-    var lMins = (l.durationMin || 0) % 60;
-    var lDurStr = lHrs > 0 ? (lHrs + 'h' + (lMins > 0 ? lMins + 'm' : '')) : (lMins + 'm');
+  sleepItems.forEach(function(item, i) {
+    var sleepTimeStr = String(item.sleepH).padStart(2,'0') + ':' + String(item.sleepM).padStart(2,'0');
+    var wakeTimeStr  = (item.wakeH != null) ? (String(item.wakeH).padStart(2,'0') + ':' + String(item.wakeM).padStart(2,'0')) : '—';
+    var iHrs = Math.floor(item.dur / 60);
+    var iMins = item.dur % 60;
+    var iDurStr = iHrs > 0 ? (iHrs + 'h' + (iMins > 0 ? iMins + 'm' : '')) : (iMins + 'm');
+    var crossLabel = '';
+    if (item.isCrossDay && item.crossPart === 'before') crossLabel = ' <small style="color:var(--muted);">(昨晚)</small>';
+    if (item.isCrossDay && item.crossPart === 'after')  crossLabel = ' <small style="color:var(--muted);">(今晨)</small>';
     detailsHtml += '<div style="display:flex; gap:12px; font-size:12px; color:var(--muted);' + (i > 0 ? ' margin-top:6px;' : '') + '">' +
       '<span>😴 ' + sleepTimeStr + '</span>' +
       '<span>⏰ ' + wakeTimeStr + '</span>' +
-      '<span style="color:var(--text);">' + lDurStr + '</span>' +
-      (l.coins ? '<span style="color:var(--gold);">+' + l.coins + '金</span>' : '') +
+      '<span style="color:var(--text);">' + iDurStr + crossLabel + '</span>' +
+      (item.coins ? '<span style="color:var(--gold);">+' + item.coins + '金</span>' : '') +
     '</div>';
   });
   el.innerHTML =
