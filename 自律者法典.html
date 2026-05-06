@@ -2055,8 +2055,8 @@
       <button class="btn" onclick="pullFromCloud()" style="flex:1;">📥 从云下载</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">📤 导出备份文件</button>
-      <button class="btn" onclick="importData()" style="flex:1;background:linear-gradient(135deg,#3a2a1a,#2a1a0f);color:#ffcc80;">📂 导入备份文件</button>
+      <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">📤 导出数据</button>
+      <button class="btn" onclick="openImportModal()" style="flex:1;background:linear-gradient(135deg,#3a2a1a,#2a1a0f);color:#ffcc80;">📂 导入数据</button>
     </div>
     <button class="btn" onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.05);color:#888;">关闭</button>
 
@@ -4197,21 +4197,128 @@ initSleepPage();
 function exportData() {
   const d = collectAllData();
   const json = JSON.stringify(d, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const fileName = '自律者法典_备份_' + new Date().toISOString().slice(0,10) + '.json';
+
+  // 弹窗展示数据，支持下载+复制
+  var overlay = document.getElementById('exportDataOverlay');
+  if (!overlay) {
+    // 首次创建弹窗
+    overlay = document.createElement('div');
+    overlay.id = 'exportDataOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:16px;font-weight:700;">📤 导出数据</span>' +
+        '<button onclick="document.getElementById(\'exportDataOverlay\').style.display=\'none\'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">方式1：点击下载文件 | 方式2：复制文本后在另一设备粘贴导入</div>' +
+      '<textarea id="exportDataText" readonly style="flex:1;min-height:120px;max-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;resize:none;font-family:monospace;word-break:break-all;"></textarea>' +
+      '<div style="display:flex;gap:10px;margin-top:12px;">' +
+        '<button onclick="downloadExportFile()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;">💾 下载文件</button>' +
+        '<button onclick="copyExportData()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📋 复制文本</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('exportDataText').value = json;
+  overlay.style.display = 'flex';
+}
+
+function downloadExportFile() {
+  var text = document.getElementById('exportDataText').value;
+  var blob = new Blob([text], { type: 'application/json' });
+  var fileName = '自律者法典_备份_' + new Date().toISOString().slice(0,10) + '.json';
+  if (window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, fileName);
+    return;
+  }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
-  a.download = '自律者法典_备份_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = fileName;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('📤 备份文件已下载');
+  setTimeout(function() {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 300);
+  showToast('📤 文件下载中...');
+}
+
+function copyExportData() {
+  var text = document.getElementById('exportDataText').value;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('✅ 已复制到剪贴板，可粘贴到另一设备导入');
+    }).catch(function() {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.getElementById('exportDataText');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    showToast('✅ 已复制到剪贴板');
+  } catch(e) {
+    showToast('❌ 复制失败，请手动长按文本选择复制');
+  }
 }
 
 function importData() {
   const input = document.getElementById('importFileInput');
   if (input) input.click();
+}
+
+// 打开导入弹窗（支持文件选择 + 粘贴文本）
+function openImportModal() {
+  var overlay = document.getElementById('importDataOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'importDataOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:16px;font-weight:700;">📂 导入数据</span>' +
+        '<button onclick="document.getElementById(\'importDataOverlay\').style.display=\'none\'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">方式1：选择备份文件 | 方式2：粘贴从另一设备复制的文本</div>' +
+      '<button onclick="document.getElementById(\'importFileInput\').click(); document.getElementById(\'importDataOverlay\').style.display=\'none\';" style="width:100%;padding:12px;border-radius:10px;border:1px dashed var(--border);background:var(--card2);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:10px;">📁 选择备份文件</button>' +
+      '<textarea id="importDataText" placeholder="或在此粘贴备份数据文本..." style="flex:1;min-height:120px;max-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;resize:none;font-family:monospace;word-break:break-all;"></textarea>' +
+      '<button onclick="importFromText()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;margin-top:10px;">📂 导入文本数据</button>' +
+    '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('importDataText').value = '';
+  overlay.style.display = 'flex';
+}
+
+function importFromText() {
+  var text = document.getElementById('importDataText').value.trim();
+  if (!text) { showToast('请先粘贴备份数据'); return; }
+  try {
+    var data = JSON.parse(text);
+    if (!data || typeof data !== 'object') throw new Error('无效的数据格式');
+    var hasKnown = SYNC_DATA_KEYS.some(function(k) { return data[k] !== undefined; });
+    if (!hasKnown) throw new Error('未识别的备份数据');
+    if (!confirm('导入将覆盖当前本地数据，确定继续？')) return;
+    applyAllData(data);
+    G = loadData();
+    timerAccum = loadTimerAccum();
+    updatePreview(); renderAll();
+    updateSleepView(); renderSleepHistory();
+    refreshSleepDuration();
+    document.getElementById('importDataOverlay').style.display = 'none';
+    showToast('📂 备份数据已导入');
+  } catch(err) {
+    showToast('❌ 导入失败：' + err.message);
+  }
 }
 
 function handleFileImport(event) {
@@ -5559,7 +5666,68 @@ var INITIAL_QUOTES = [
   {text: "学习时，尽可能把输入变成输出。 尽可能把所有感官都调动，而不仅仅是眼睛看。 手要写，脑子要思考，耳朵要听，嘴巴要念。"},
   {text: "上天想给你最好礼物的时候，会先让你腾空双手。"},
   {text: "放松点。生活不会因为你心弦紧绷,而事事顺遂。"},
-  {text: "与人交往，要做好两个前提准备:一是要坚信对方是好人，二是要明了对方是凡人。是好人，就必然有向善、行善的需求;是凡人，他的情绪和意识就必然有善变、不稳定的一面。在这两个前提下与人交往，必然会超脱和豁达，也会更具备与人方便的能力。"}
+  {text: "与人交往，要做好两个前提准备:一是要坚信对方是好人，二是要明了对方是凡人。是好人，就必然有向善、行善的需求;是凡人，他的情绪和意识就必然有善变、不稳定的一面。在这两个前提下与人交往，必然会超脱和豁达，也会更具备与人方便的能力。"},
+  {text: "把工作里能接触到的一切资源为我所用：沉淀我的能力，优化我的履历，布局我的未来，事儿真做砸了也是花老板的钱。"},
+  {text: "不钻牛角尖，解决不了的问题先写下来。事缓则圆。"},
+  {text: "塞翁失马，焉知非福。有更好的机会在前面等着你。"},
+  {text: "无论别人对你说什么，你都无动于衷。不要被愤怒冲昏了头脑。学会计算，怎样对你最有利。"},
+  {text: "不抛弃，不放弃。向人类轻步兵的巅峰致敬。"},
+  {text: "网瘾主要出现在晚上，之前为了掩盖疲劳、压力等不适感将疲劳与网瘾联系了起来。躺下听冥想相关的书。躺半个小时睡不着再起来学习半个小时。如此循环直到能够睡着。睡不着没关系，躺着就行。", scene: "evening"},
+  {text: "迎难而上，直面困难。"},
+  {text: "保持情绪稳定，学会算账，当下怎样做是对自己最有利的。"},
+  {text: "程序设计之初，就是为了吸引你的注意力，挑起你的情绪。时间宝贵，不要被电子产品控制，应该是你来控制电子产品，你来作主导。"},
+  {text: "很多事情是不能一蹴而就的，要有耐心，徐徐图之。"},
+  {text: "积极乐观，耐心平和。"},
+  {text: "疲惫的时候，一定不要玩手机。迅速洗漱好睡觉。", scene: "evening"},
+  {text: "对所有事情都持开放、包容、接纳的态度。一切发生皆于我有利。"},
+  {text: "快乐多一点，笑容多一点。"},
+  {text: "欲成大树，莫与草争。"},
+  {text: "惯性：越玩手机越想玩手机，越学习越想学习。"},
+  {text: "在学习时如何吸引自己的注意力？设置悬念，向自己提问。加入自己的思考，自己给自己举例，自己给自己讲课。补充相关内容，自己加备注。"},
+  {text: "希望把时间花在什么事情上呢？把时间花在什么事情上不会后悔呢？"},
+  {text: "如果向每一只朝你吠叫的狗扔石头，那你永远也到达不了终点。"},
+  {text: "爱和善意，比苛责和鞭策更能帮助我们成长。"},
+  {text: "掌握，需要大量的重复、练习和实践。"},
+  {text: "怎么夸人？给人自己夸自己的口子：1.说优点；2说感受；3.请教他是怎么做到的。"},
+  {text: "注意力放在最重要的事情上，不被无关紧要的事情带着跑。"},
+  {text: "千言不如一默。话要想三遍才说出口，不要张嘴就来。"},
+  {text: "知其然也要知其所以然。做练习的时候要写思路，不要瞎猜。做选择题的时候，顺便写一写为什么选这个选项。"},
+  {text: "有自己的思考和体会，学到的东西才能真正变成自己的。"},
+  {text: "能念出声尽量念出声，这样更专注。不能念出声动口型也可以。"},
+  {text: "怎么样可以变得更专注？1.意识到自己走神了，就把自己拉回来。2.多做这种"走神-拉回"练习。比如：放慢呼吸，注意力集中在呼吸上，走神了就拉回来。3.养成好的生活习惯，好好睡觉。精力充沛的时候也更专注。"},
+  {text: "不喂养那只流浪猫，它就不会再出现在你的门前。"},
+  {text: "理解了和看多了死记硬背下来的感觉是不一样的。理解与死记硬背的区别在于：1.理解了就很容易举出例子来，并且可以延伸发散开去；死记硬背只能照着原搬不动地写下来。2.理解了就容易记忆，花不了多久就能背下来且不容易忘；死记硬背需要重复很多遍才能记下来，比较费时间，并且相对更容易忘。"},
+  {text: "输出比输入更容易进入心流状态，学习的时候尽可能把要学的内容转化为输出。"},
+  {text: "脑中开启屏蔽器，与无关紧要的自动屏蔽掉。"},
+  {text: "一个概念，完整地看一遍，再把它整个写下来。中间如果有遗忘就再看一眼。"},
+  {text: "对于大纲中的概念，要能举出例子（或例题）。"},
+  {text: "数学概念、定理相当于是工具，各种数学考试考的是对工具使用的熟练程度。"},
+  {text: "书要边看边写读后感。尽可能把输入变成输出。"},
+  {text: "把自己当成老师，怎么讲学生才能听懂？知识点拆分。复杂知识点拆分成简单知识点。拆分到最基础。基础的掌握了，再一点点复合，用来解决复杂问题。"},
+  {text: "理解了就复述一遍。"},
+  {text: "分辨清哪些是外在的诱惑，哪些是你真正想要的。"},
+  {text: "坚决不再凑单了。时间比省下来的那点小钱宝贵多了。需要再买，时间宝贵。"},
+  {text: "到了晚上，睡觉前，可能会有一阵特别想玩手机。不要玩，玩了一定会后悔。有这种感觉的时候，躺下，闭眼，跟着有声书一起冥想。", scene: "evening"},
+  {text: "拥抱痛苦，为所当为。这才是多巴胺掩盖下的真正快乐。"},
+  {text: "爱是最伟大的力量。"},
+  {text: "一个积极乐观的心态真的太重要啦！用积极的语言与自己对话。"},
+  {text: "在任何情况下，任何人都能凭借精神的力量顽强地捍卫和坚守自己的内在自由。"},
+  {text: "每一次挫折都是一次改进的契机，是包装过的礼物。"},
+  {text: "我职位低，大家都不愿同我来往。我的一项任务是登记来图书馆看报纸的读者姓名，但他们大多没把我当成一个活生生的人。在那些来图书馆阅读的人中，我认出了一些新文化运动著名领袖，像傅斯年、罗家伦等，这些人我都非常感兴趣。我试图与他们谈谈政治和文化问题，但他们都很忙，没空听一个图书馆助理馆员讲南方土话。不过我没有气馁。我加入了哲学会和新闻学会，目的是在北大旁听课程。"},
+  {text: "只管往前跑，什么都不要想。我拥有一目十行的能力、超强的记忆力、非常棒的理解能力、举一反三的学习能力、有智慧、有勇气、敢于面对一切挫折和困难、敢于为自己争取想要的幸福生活。"},
+  {text: "网瘾忍一忍就过去了，玩了肯定会后悔。最难受的不是失败，而是"我本可以"。"},
+  {text: "每次吃到的资源，都是在增加你的独特性，把你从一个普通的、随处可寻的零件，变成不那么好找替代品的高价值零件。虽然还是零件，但中枢轴承的待遇和外围齿轮的待遇终究是不一样的。"},
+  {text: "和时间赛跑。"},
+  {text: "吓倒我的，只是幻象。"},
+  {text: "脾气大小和内心强弱是成反比的。脾气越大的人，反而内心越虚弱。\n因为他的脾气来自于内心的不安，面对问题他没有或只有很少的解决办法，只好用发脾气来掩饰自己的无能，甚至诉诸武力，试图靠暴力解决一切问题。\n当一个人面对问题至少有三种以上的解决方案时，他的内心自然就淡定了，不需要试图用脾气来解决。\n脾气越平和的人，内心越强大。\n平和不是懦弱，懦弱是畏惧、害怕的体现，试图通过逃避来躲开问题。\n平和是不卑不亢，淡定安然，是泰山崩于前而不惊，是在紧急情况下仍然能理智思考问题而不被情绪冲昏头脑，是勇敢面对一切困难，是敢于接受新的机遇和挑战。"},
+  {text: "开心也是一天，不开心也是一天，干嘛不开心得过呢？每天都开开心心。"},
+  {text: "没睡好也不要紧。只要醒着，就把效率打到最高。"},
+  {text: "一疲劳就容易崩。尽量避免疲劳。实在无法避免的时候，就想想马旭。"},
+  {text: "很多事情无法控制，把自己能力范围之内的做好就行。"},
+  {text: "放弃和认命是一条没有尽头的"下坡路"。请记住，在任何一个你没有察觉的时刻，包括现在，通过行动去改变命运的机会，一直都存在。"},
+  {text: "人不是被情绪摆布的脆弱存在。"},
+  {text: "戒手机就像戒烟戒酒，会有戒断反应。把最难熬的那一小会儿忍过去就不想玩了，慢慢就彻底戒掉了。"},
+  {text: "分清主次。不要被不重要且不紧急的事情占用太多时间。"}
 ];
 
 function getMonday(date) {
@@ -5583,7 +5751,7 @@ function saveQuotesData(data) {
   localStorage.setItem('codex_quotes_v1', JSON.stringify(data));
 }
 
-var QUOTES_VERSION = 4; // 格言版本号，更新内容时递增
+var QUOTES_VERSION = 5; // 格言版本号，更新内容时递增
 
 function initQuotesIfEmpty() {
   var data = getQuotesData();
