@@ -2034,13 +2034,13 @@
 
     <div class="input-group">
       <label style="font-size:13px;color:#aaa;">GitHub Token</label>
-      <input class="input-field" type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxx" style="font-family:monospace;">
+      <input class="input-field" type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxx" style="font-family:monospace;border-color:#4a5ab5;background:#0d1b3e;">
       <p style="font-size:11px;color:#666;margin-top:4px;">在 GitHub → Settings → Developer settings → Personal access tokens 生成<br>勾选 <b style="color:#aaa;">gist</b> 权限</p>
     </div>
 
     <div class="input-group">
       <label style="font-size:13px;color:#aaa;">Gist ID（留空则自动创建）</label>
-      <input class="input-field" type="text" id="syncGistId" placeholder="留空=首次使用自动创建">
+      <input class="input-field" type="text" id="syncGistId" placeholder="留空=首次使用自动创建" style="border-color:#4a5ab5;background:#0d1b3e;">
       <p style="font-size:11px;color:#666;margin-top:4px;">已同步过的设备自动填写，无需手动输入</p>
     </div>
 
@@ -4389,19 +4389,28 @@ async function testSync() {
   const token = document.getElementById('syncToken').value.trim() || localStorage.getItem(SYNC_TOKEN_KEY);
   if (!token) { showToast('请先输入 Token'); return; }
   const s = document.getElementById('syncStatus');
-  s.innerHTML = '<span style="color:#aaa;">⏳ 连接中...</span>';
+  s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 连接中，请稍候...</span>';
+  showToast('⏳ 正在测试连接...');
   try {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
     const resp = await fetch('https://api.github.com/user', {
-      headers: { 'Authorization': 'token ' + token }
+      headers: { 'Authorization': 'token ' + token },
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (resp.ok) {
       const user = await resp.json();
       s.innerHTML = '<span style="color:#55efc4;">✅ 连接成功！用户: ' + user.login + '</span>';
+      showToast('✅ GitHub 连接成功');
     } else {
       s.innerHTML = '<span style="color:#fc5c65;">❌ Token无效 (HTTP ' + resp.status + ')</span>';
+      showToast('❌ Token无效');
     }
   } catch(e) {
-    s.innerHTML = '<span style="color:#fc5c65;">❌ 网络错误: ' + e.message + '</span>';
+    var errMsg = e.name === 'AbortError' ? '连接超时(10秒)，国内网络可能无法访问 GitHub API' : e.message;
+    s.innerHTML = '<span style="color:#fc5c65;">❌ 网络错误: ' + errMsg + '</span>';
+    showToast('❌ 连接失败: ' + errMsg);
   }
 }
 
@@ -4425,14 +4434,22 @@ function applyAllData(data) {
 }
 
 async function pushToCloud() {
+  console.log('[sync] pushToCloud called');
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
   let gistId = localStorage.getItem(SYNC_GIST_KEY);
+  console.log('[sync] token exists:', !!token, 'gistId exists:', !!gistId);
   if (!token) { showToast('请先配置同步 Token'); openSyncModal(); return; }
 
   const allData = collectAllData();
   const content = JSON.stringify(allData, null, 2);
   const s = document.getElementById('syncStatus');
-  if (s) s.innerHTML = '<span style="color:#aaa;">⏳ 上传中...</span>';
+  if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 上传中，请稍候...</span>';
+  showToast('⏳ 正在上传到云端...');
+
+  // 按钮禁用防重复点击
+  var btn = event && event.target;
+  var origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 上传中...'; }
 
   try {
     let url, method, body;
@@ -4446,11 +4463,16 @@ async function pushToCloud() {
       method = 'POST';
       body = { description: '自律者法典 - 云端备份', public: false, files };
     }
+    // 10秒超时
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
     const resp = await fetch(url, {
       method,
       headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       throw new Error('HTTP ' + resp.status + (err.message ? ': ' + err.message : ''));
@@ -4465,23 +4487,38 @@ async function pushToCloud() {
     if (s) s.innerHTML = '<span style="color:#55efc4;">✅ 上传成功！Gist: ' + gistId.slice(0,8) + '...</span>';
     showToast('☁️ 云端备份成功');
   } catch(e) {
-    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 上传失败: ' + e.message + '</span>';
-    showToast('❌ 云端上传失败');
+    var errMsg = e.message;
+    if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
+    console.error('[sync] pushToCloud error:', e);
+    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 上传失败: ' + errMsg + '</span>';
+    showToast('❌ 云端上传失败: ' + errMsg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText || '☁️ 上传到云'; }
   }
 }
 
 async function pullFromCloud() {
+  console.log('[sync] pullFromCloud called');
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
   const gistId = localStorage.getItem(SYNC_GIST_KEY);
   if (!token || !gistId) { showToast('请先完成同步设置'); openSyncModal(); return; }
 
   const s = document.getElementById('syncStatus');
-  if (s) s.innerHTML = '<span style="color:#aaa;">⏳ 下载中...</span>';
+  if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 下载中，请稍候...</span>';
+  showToast('⏳ 正在从云端下载...');
+
+  var btn = event && event.target;
+  var origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 下载中...'; }
 
   try {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
     const resp = await fetch('https://api.github.com/gists/' + gistId, {
-      headers: { 'Authorization': 'token ' + token }
+      headers: { 'Authorization': 'token ' + token },
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const gist = await resp.json();
     const file = gist.files['codex_data.json'];
@@ -4499,8 +4536,13 @@ async function pullFromCloud() {
     timerAccum = loadTimerAccum(); renderTimerAccum();
     updateSleepView(); renderSleepHistory();
   } catch(e) {
-    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + e.message + '</span>';
-    showToast('❌ 云端下载失败');
+    var errMsg = e.message;
+    if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
+    console.error('[sync] pullFromCloud error:', e);
+    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + errMsg + '</span>';
+    showToast('❌ 云端下载失败: ' + errMsg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText || '📥 从云下载'; }
   }
 }
 
