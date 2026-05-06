@@ -3939,16 +3939,18 @@ function updateSleepView() {
     document.getElementById('sleepNotInBed').style.display = 'none';
     document.getElementById('sleepWokeUp').style.display = 'none';
   } else {
-    // 检查今天是否已起床（有记录）
+    // 检查今天是否有睡眠记录（可能有多条）
     const logs = loadSleepLog();
-    const todayLog = logs.find(l => l.date === today());
-    if (todayLog) {
+    const todayLogs = logs.filter(l => l.date === today());
+    if (todayLogs.length > 0) {
+      // 显示最新的一条起床结果
+      const latestLog = todayLogs[todayLogs.length - 1];
       showWakeResult(
-        Math.floor(todayLog.durationMin / 60),
-        todayLog.durationMin % 60,
-        todayLog.sleepH, todayLog.sleepM,
-        todayLog.wakeH, todayLog.wakeM,
-        todayLog.coins
+        Math.floor(latestLog.durationMin / 60),
+        latestLog.durationMin % 60,
+        latestLog.sleepH, latestLog.sleepM,
+        latestLog.wakeH, latestLog.wakeM,
+        latestLog.coins
       );
     } else {
       document.getElementById('sleepNotInBed').style.display = 'block';
@@ -4107,20 +4109,21 @@ function refreshSleepDuration() {
 
 function syncSleepToCheckin() {
   const logs = loadSleepLog();
-  const todayLog = logs.find(l => l.date === today());
-  if (!todayLog) {
+  const todayLogs = logs.filter(l => l.date === today());
+  if (todayLogs.length === 0) {
     showToast('无今日睡眠记录');
     return;
   }
 
-  // 同步入睡时间到打卡页
-  document.getElementById('sleepHour').value = todayLog.sleepH;
-  document.getElementById('sleepMinute').value = todayLog.sleepM;
+  // 同步最新一条的入睡时间到打卡页
+  const latestLog = todayLogs[todayLogs.length - 1];
+  document.getElementById('sleepHour').value = latestLog.sleepH;
+  document.getElementById('sleepMinute').value = latestLog.sleepM;
 
   updatePreview();
   refreshSleepDuration();
   switchTab('checkin');
-  showToast(`🌙 已同步：入睡 ${String(todayLog.sleepH).padStart(2,'0')}:${String(todayLog.sleepM).padStart(2,'0')}，+${todayLog.coins} 金币`);
+  showToast(`🌙 已同步：入睡 ${String(latestLog.sleepH).padStart(2,'0')}:${String(latestLog.sleepM).padStart(2,'0')}，+${latestLog.coins} 金币`);
 }
 
 function renderSleepHistory() {
@@ -5574,10 +5577,6 @@ function saveManualSleep() {
     logs[_editingSleepIdx] = { date: date, sleepH: sleepH, sleepM: sleepM, wakeH: wakeH, wakeM: wakeM, durationMin: durationMin, coins: coins, manual: true };
     showToast('✅ 已更新 ' + date + ' 的睡眠记录');
   } else {
-    if (logs.find(function(l) { return l.date === date; })) {
-      showToast('该日期已有睡眠记录，请使用编辑功能');
-      return;
-    }
     logs.push({ date: date, sleepH: sleepH, sleepM: sleepM, wakeH: wakeH, wakeM: wakeM, durationMin: durationMin, coins: coins, manual: true });
     showToast('✅ 已添加 ' + date + ' 的睡眠记录');
   }
