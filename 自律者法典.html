@@ -257,7 +257,7 @@
       border: 1px solid var(--border);
       opacity: 0;
       transition: all 0.3s;
-      z-index: 9999;
+      z-index: 100000;
       white-space: nowrap;
       backdrop-filter: blur(10px);
     }
@@ -2051,8 +2051,8 @@
       <button class="btn" onclick="testSync()" style="flex:1;background:linear-gradient(135deg,#1a3a2a,#0f2a1a);color:#55efc4;">🔗 测试连接</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn" onclick="pushToCloud(this)" style="flex:1;">☁️ 上传到云</button>
-      <button class="btn" onclick="pullFromCloud(this)" style="flex:1;">📥 从云下载</button>
+      <button class="btn" id="btnPushCloud" onclick="pushToCloud(this)" style="flex:1;">☁️ 上传到云</button>
+      <button class="btn" id="btnPullCloud" onclick="pullFromCloud(this)" style="flex:1;">📥 从云下载</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">📤 导出数据</button>
@@ -4358,6 +4358,11 @@ function openSyncModal() {
   m.style.display = 'flex';
   document.getElementById('syncToken').value = localStorage.getItem(SYNC_TOKEN_KEY) || '';
   document.getElementById('syncGistId').value = localStorage.getItem(SYNC_GIST_KEY) || '';
+  // 重置按钮状态（防止disabled残留）
+  var btnPush = document.getElementById('btnPushCloud');
+  var btnPull = document.getElementById('btnPullCloud');
+  if (btnPush) { btnPush.disabled = false; btnPush.textContent = '☁️ 上传到云'; }
+  if (btnPull) { btnPull.disabled = false; btnPull.textContent = '📥 从云下载'; }
   const s = document.getElementById('syncStatus');
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
   const gid = localStorage.getItem(SYNC_GIST_KEY);
@@ -4434,59 +4439,66 @@ function applyAllData(data) {
 }
 
 async function pushToCloud(btn) {
-  console.log('[sync] pushToCloud called');
-  const token = localStorage.getItem(SYNC_TOKEN_KEY);
-  let gistId = localStorage.getItem(SYNC_GIST_KEY);
-  console.log('[sync] token exists:', !!token, 'gistId exists:', !!gistId);
-  if (!token) { showToast('请先配置同步 Token'); openSyncModal(); return; }
-
-  const allData = collectAllData();
-  const content = JSON.stringify(allData, null, 2);
-  const s = document.getElementById('syncStatus');
-  if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 上传中，请稍候...</span>';
-  showToast('⏳ 正在上传到云端...');
-
-  // 按钮禁用防重复点击（btn通过onclick(this)传入）
+  // === 入口确认（最先执行，任何错误都能看到） ===
+  var s = document.getElementById('syncStatus');
   var origText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 上传中...'; }
+  try {
+    if (s) s.innerHTML = '<span style="color:#f5a623;font-size:15px;">⏳ 开始上传...</span>';
+    if (btn) { btn.textContent = '⏳ 上传中...'; btn.disabled = true; }
+  } catch(e2) {}
 
   try {
-    let url, method, body;
-    const files = { 'codex_data.json': { content } };
+    console.log('[sync] pushToCloud called');
+    var token = localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    console.log('[sync] token exists:', !!token, 'gistId exists:', !!gistId);
+    if (!token) {
+      showToast('请先配置同步 Token');
+      openSyncModal();
+      if (btn) { btn.disabled = false; btn.textContent = '☁️ 上传到云'; }
+      return;
+    }
+
+    var allData = collectAllData();
+    var content = JSON.stringify(allData, null, 2);
+    if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 上传中，请稍候...</span>';
+    showToast('⏳ 正在上传到云端...');
+
+    var url, method, body;
+    var files = { 'codex_data.json': { content: content } };
     if (gistId) {
       url = 'https://api.github.com/gists/' + gistId;
       method = 'PATCH';
-      body = { files };
+      body = { files: files };
     } else {
       url = 'https://api.github.com/gists';
       method = 'POST';
-      body = { description: '自律者法典 - 云端备份', public: false, files };
+      body = { description: '自律者法典 - 云端备份', public: false, files: files };
     }
-    // 10秒超时
     var controller = new AbortController();
     var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
-    const resp = await fetch(url, {
-      method,
+    var resp = await fetch(url, {
+      method: method,
       headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
+      var err = await resp.json().catch(function() { return {}; });
       throw new Error('HTTP ' + resp.status + (err.message ? ': ' + err.message : ''));
     }
-    const result = await resp.json();
+    var result = await resp.json();
     if (!gistId) {
       gistId = result.id;
       localStorage.setItem(SYNC_GIST_KEY, gistId);
-      const inp = document.getElementById('syncGistId');
+      var inp = document.getElementById('syncGistId');
       if (inp) inp.value = gistId;
     }
     if (s) s.innerHTML = '<span style="color:#55efc4;">✅ 上传成功！Gist: ' + gistId.slice(0,8) + '...</span>';
     showToast('☁️ 云端备份成功');
   } catch(e) {
-    var errMsg = e.message;
+    var errMsg = e.message || '未知错误';
     if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
     console.error('[sync] pushToCloud error:', e);
     if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 上传失败: ' + errMsg + '</span>';
@@ -4497,32 +4509,40 @@ async function pushToCloud(btn) {
 }
 
 async function pullFromCloud(btn) {
-  console.log('[sync] pullFromCloud called');
-  const token = localStorage.getItem(SYNC_TOKEN_KEY);
-  const gistId = localStorage.getItem(SYNC_GIST_KEY);
-  if (!token || !gistId) { showToast('请先完成同步设置'); openSyncModal(); return; }
-
-  const s = document.getElementById('syncStatus');
-  if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 下载中，请稍候...</span>';
-  showToast('⏳ 正在从云端下载...');
-
-  // 按钮禁用防重复点击（btn通过onclick(this)传入）
+  // === 入口确认 ===
+  var s = document.getElementById('syncStatus');
   var origText2 = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 下载中...'; }
+  try {
+    if (s) s.innerHTML = '<span style="color:#f5a623;font-size:15px;">⏳ 开始下载...</span>';
+    if (btn) { btn.textContent = '⏳ 下载中...'; btn.disabled = true; }
+  } catch(e2) {}
 
   try {
+    console.log('[sync] pullFromCloud called');
+    var token = localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    if (!token || !gistId) {
+      showToast('请先完成同步设置');
+      openSyncModal();
+      if (btn) { btn.disabled = false; btn.textContent = '📥 从云下载'; }
+      return;
+    }
+
+    if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 下载中，请稍候...</span>';
+    showToast('⏳ 正在从云端下载...');
+
     var controller = new AbortController();
     var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
-    const resp = await fetch('https://api.github.com/gists/' + gistId, {
+    var resp = await fetch('https://api.github.com/gists/' + gistId, {
       headers: { 'Authorization': 'token ' + token },
       signal: controller.signal
     });
     clearTimeout(timeoutId);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const gist = await resp.json();
-    const file = gist.files['codex_data.json'];
+    var gist = await resp.json();
+    var file = gist.files['codex_data.json'];
     if (!file || !file.content) throw new Error('云端无数据文件');
-    const cloudData = JSON.parse(file.content);
+    var cloudData = JSON.parse(file.content);
 
     applyAllData(cloudData);
 
@@ -4535,11 +4555,12 @@ async function pullFromCloud(btn) {
     timerAccum = loadTimerAccum(); renderTimerAccum();
     updateSleepView(); renderSleepHistory();
   } catch(e) {
-    var errMsg = e.message;
+    var errMsg = e.message || '未知错误';
     if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
     console.error('[sync] pullFromCloud error:', e);
     if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + errMsg + '</span>';
     showToast('❌ 云端下载失败: ' + errMsg);
+
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = origText2 || '📥 从云下载'; }
   }
