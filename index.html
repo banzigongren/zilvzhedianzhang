@@ -257,7 +257,7 @@
       border: 1px solid var(--border);
       opacity: 0;
       transition: all 0.3s;
-      z-index: 9999;
+      z-index: 100000;
       white-space: nowrap;
       backdrop-filter: blur(10px);
     }
@@ -1351,6 +1351,11 @@
     </div>
   </div>
 
+  <div class="card" id="sleepDurationCard">
+    <div class="card-title"><span class="icon">🌙</span>今日睡眠时间</div>
+    <div id="sleepDurationContent" style="font-size:14px; color:var(--muted);">加载中…</div>
+  </div>
+
   <div class="card">
     <div class="card-title"><span class="icon">📚</span>今日学习时间</div>
     <div class="input-row">
@@ -2029,13 +2034,13 @@
 
     <div class="input-group">
       <label style="font-size:13px;color:#aaa;">GitHub Token</label>
-      <input class="input-field" type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxx" style="font-family:monospace;">
+      <input class="input-field" type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxx" style="font-family:monospace;border-color:#4a5ab5;background:#0d1b3e;">
       <p style="font-size:11px;color:#666;margin-top:4px;">在 GitHub → Settings → Developer settings → Personal access tokens 生成<br>勾选 <b style="color:#aaa;">gist</b> 权限</p>
     </div>
 
     <div class="input-group">
       <label style="font-size:13px;color:#aaa;">Gist ID（留空则自动创建）</label>
-      <input class="input-field" type="text" id="syncGistId" placeholder="留空=首次使用自动创建">
+      <input class="input-field" type="text" id="syncGistId" placeholder="留空=首次使用自动创建" style="border-color:#4a5ab5;background:#0d1b3e;">
       <p style="font-size:11px;color:#666;margin-top:4px;">已同步过的设备自动填写，无需手动输入</p>
     </div>
 
@@ -2046,12 +2051,12 @@
       <button class="btn" onclick="testSync()" style="flex:1;background:linear-gradient(135deg,#1a3a2a,#0f2a1a);color:#55efc4;">🔗 测试连接</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn" onclick="pushToCloud()" style="flex:1;">☁️ 上传到云</button>
-      <button class="btn" onclick="pullFromCloud()" style="flex:1;">📥 从云下载</button>
+      <button class="btn" id="btnPushCloud" onclick="pushToCloud(this)" style="flex:1;">☁️ 上传到云</button>
+      <button class="btn" id="btnPullCloud" onclick="pullFromCloud(this)" style="flex:1;">📥 从云下载</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">📤 导出备份文件</button>
-      <button class="btn" onclick="importData()" style="flex:1;background:linear-gradient(135deg,#3a2a1a,#2a1a0f);color:#ffcc80;">📂 导入备份文件</button>
+      <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">📤 导出数据</button>
+      <button class="btn" onclick="openImportModal()" style="flex:1;background:linear-gradient(135deg,#3a2a1a,#2a1a0f);color:#ffcc80;">📂 导入数据</button>
     </div>
     <button class="btn" onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.05);color:#888;">关闭</button>
 
@@ -3565,8 +3570,18 @@ function syncFromSchedule() {
     else if (seg.type === 'waste') wasteM += dur;
     else if (seg.type === 'fun') funM += dur;
     else if (seg.type === 'daily') dailyM += dur;
-    // sleep 不计入打卡字段
+    // sleep：从日程睡眠时段提取入睡时间
   });
+
+  // 从日程睡眠时段同步入睡时间
+  var sleepSegs = segs.filter(function(seg) { return seg.type === 'sleep'; });
+  if (sleepSegs.length > 0) {
+    var firstSleep = sleepSegs[0];
+    var bedHour = Math.floor(firstSleep.startMin / 60) % 24;
+    var bedMin  = firstSleep.startMin % 60;
+    document.getElementById('sleepHour').value   = bedHour;
+    document.getElementById('sleepMinute').value = bedMin;
+  }
 
   document.getElementById('studyMin').value = studyM;
   document.getElementById('workMin').value = workM;
@@ -3576,6 +3591,7 @@ function syncFromSchedule() {
   document.getElementById('dailyMin').value = dailyM;
 
   updatePreview();
+  refreshSleepDuration();
   showToast(`📅 已同步：学习${studyM}分 工作${workM}分 运动${sportM}分 浪费${wasteM}分 娱乐${funM}分 日常${dailyM}分`);
 }
 
@@ -3893,6 +3909,8 @@ function wakeUp() {
 
   // 显示起床结果
   showWakeResult(hrs, mins, sleepH, sleepM, now.getHours(), now.getMinutes(), coins);
+  // 刷新打卡页睡眠时长
+  refreshSleepDuration();
   // 起床后弹出格言警句
   showQuoteModal('morning');
 }
@@ -3921,16 +3939,18 @@ function updateSleepView() {
     document.getElementById('sleepNotInBed').style.display = 'none';
     document.getElementById('sleepWokeUp').style.display = 'none';
   } else {
-    // 检查今天是否已起床（有记录）
+    // 检查今天是否有睡眠记录（可能有多条）
     const logs = loadSleepLog();
-    const todayLog = logs.find(l => l.date === today());
-    if (todayLog) {
+    const todayLogs = logs.filter(l => l.date === today());
+    if (todayLogs.length > 0) {
+      // 显示最新的一条起床结果
+      const latestLog = todayLogs[todayLogs.length - 1];
       showWakeResult(
-        Math.floor(todayLog.durationMin / 60),
-        todayLog.durationMin % 60,
-        todayLog.sleepH, todayLog.sleepM,
-        todayLog.wakeH, todayLog.wakeM,
-        todayLog.coins
+        Math.floor(latestLog.durationMin / 60),
+        latestLog.durationMin % 60,
+        latestLog.sleepH, latestLog.sleepM,
+        latestLog.wakeH, latestLog.wakeM,
+        latestLog.coins
       );
     } else {
       document.getElementById('sleepNotInBed').style.display = 'block';
@@ -3939,21 +3959,171 @@ function updateSleepView() {
   }
 }
 
+// ========== 打卡页睡眠时长显示 ==========
+// 睡眠跨天拆分规则：入睡日 22:30~24:00 计入入睡日，起床日 00:00~07:30 计入起床日
+function getSleepMinutesForDate(logs, targetDate) {
+  // 返回 [{ sleepH, sleepM, wakeH, wakeM, dur, coins, isCrossDay, crossPart }]
+  var results = [];
+  logs.forEach(function(l) {
+    var sleepMin = l.sleepH * 60 + l.sleepM;
+    var wakeMin  = (l.wakeH != null ? l.wakeH * 60 + (l.wakeM || 0) : -1);
+    var isCrossDay = wakeMin >= 0 && sleepMin >= 18 * 60 && wakeMin < sleepMin;
+    if (!isCrossDay) {
+      // 不跨天：整条记录属于 l.date
+      if (l.date === targetDate) {
+        results.push({
+          sleepH: l.sleepH, sleepM: l.sleepM,
+          wakeH: l.wakeH, wakeM: l.wakeM,
+          dur: l.durationMin || 0, coins: l.coins || 0,
+          isCrossDay: false, crossPart: null
+        });
+      }
+    } else {
+      // 跨天：入睡到24:00归入睡日，00:00到起床归起床日(l.date)
+      var beforeMidnight = 1440 - sleepMin; // 入睡→24:00
+      var afterMidnight  = wakeMin;         // 00:00→起床
+      // 入睡日期：l.date 的前一天
+      var sleepDate = dayBefore(l.date);
+      if (sleepDate === targetDate) {
+        results.push({
+          sleepH: l.sleepH, sleepM: l.sleepM,
+          wakeH: 0, wakeM: 0,
+          dur: beforeMidnight, coins: l.coins || 0,
+          isCrossDay: true, crossPart: 'before'
+        });
+      }
+      if (l.date === targetDate) {
+        results.push({
+          sleepH: 0, wakeH: l.wakeH,
+          sleepM: 0, wakeM: l.wakeM,
+          dur: afterMidnight, coins: 0,
+          isCrossDay: true, crossPart: 'after'
+        });
+      }
+    }
+  });
+  return results;
+}
+
+function dayBefore(dateStr) {
+  // '2026-05-05' → '2026-05-04'
+  var d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + dd;
+}
+
+function refreshSleepDuration() {
+  var el = document.getElementById('sleepDurationContent');
+  if (!el) return;
+  var logs = loadSleepLog();
+  var targetDate = today();
+  var sleepItems = getSleepMinutesForDate(logs, targetDate);
+
+  if (sleepItems.length === 0) {
+    // 兜底：尝试从今日日程的睡眠时段读取
+    var schedule = getDaySchedule(targetDate);
+    var sleepSegs = (schedule.segments || []).filter(function(seg) { return seg.type === 'sleep'; });
+    if (sleepSegs.length > 0) {
+      var totalDur = 0;
+      sleepSegs.forEach(function(seg) { totalDur += (seg.endMin - seg.startMin); });
+      var hrs = Math.floor(totalDur / 60);
+      var mins = totalDur % 60;
+      var durStr = hrs > 0 ? (hrs + '小时' + (mins > 0 ? mins + '分钟' : '')) : (mins + '分钟');
+      var quality = '';
+      if (totalDur >= 420) quality = '<span style="color:var(--green);">充足</span>';
+      else if (totalDur >= 360) quality = '<span style="color:var(--gold);">适中</span>';
+      else if (totalDur >= 300) quality = '<span style="color:#e67e22;">不足</span>';
+      else quality = '<span style="color:var(--accent);">严重不足</span>';
+      var detailsHtml = '';
+      sleepSegs.forEach(function(seg, i) {
+        var sh = Math.floor(seg.startMin / 60) % 24;
+        var sm = seg.startMin % 60;
+        var eh = Math.floor(seg.endMin / 60) % 24;
+        var em = seg.endMin % 60;
+        var segDur = seg.endMin - seg.startMin;
+        var dHrs = Math.floor(segDur / 60);
+        var dMins = segDur % 60;
+        var dStr = dHrs > 0 ? (dHrs + 'h' + (dMins > 0 ? dMins + 'm' : '')) : (dMins + 'm');
+        detailsHtml += '<div style="display:flex; gap:12px; font-size:12px; color:var(--muted);' + (i > 0 ? ' margin-top:6px;' : '') + '">' +
+          '<span>😴 ' + String(sh).padStart(2,'0') + ':' + String(sm).padStart(2,'0') + '</span>' +
+          '<span>⏰ ' + String(eh).padStart(2,'0') + ':' + String(em).padStart(2,'0') + '</span>' +
+          '<span style="color:var(--text);">' + dStr + '</span>' +
+        '</div>';
+      });
+      el.innerHTML =
+        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+          '<span style="font-size:22px; font-weight:700; color:var(--text);">' + durStr + '</span>' +
+          '<span style="font-size:12px;">睡眠质量：' + quality + ' <small>(来自日程)</small></span>' +
+        '</div>' +
+        detailsHtml;
+      return;
+    }
+    el.innerHTML = '<div style="text-align:center; padding:8px 0; color:var(--muted);">暂无今日睡眠记录</div>';
+    return;
+  }
+
+  var totalDur = 0;
+  var totalCoins = 0;
+  sleepItems.forEach(function(item) {
+    totalDur += item.dur;
+    totalCoins += item.coins;
+  });
+  var hrs = Math.floor(totalDur / 60);
+  var mins = totalDur % 60;
+  var durStr = hrs > 0 ? (hrs + '小时' + (mins > 0 ? mins + '分钟' : '')) : (mins + '分钟');
+  // 睡眠质量评估
+  var quality = '';
+  if (totalDur >= 420) quality = '<span style="color:var(--green);">充足</span>';
+  else if (totalDur >= 360) quality = '<span style="color:var(--gold);">适中</span>';
+  else if (totalDur >= 300) quality = '<span style="color:#e67e22;">不足</span>';
+  else quality = '<span style="color:var(--accent);">严重不足</span>';
+  // 构建每条记录详情
+  var detailsHtml = '';
+  sleepItems.forEach(function(item, i) {
+    var sleepTimeStr = String(item.sleepH).padStart(2,'0') + ':' + String(item.sleepM).padStart(2,'0');
+    var wakeTimeStr  = (item.wakeH != null) ? (String(item.wakeH).padStart(2,'0') + ':' + String(item.wakeM).padStart(2,'0')) : '—';
+    var iHrs = Math.floor(item.dur / 60);
+    var iMins = item.dur % 60;
+    var iDurStr = iHrs > 0 ? (iHrs + 'h' + (iMins > 0 ? iMins + 'm' : '')) : (iMins + 'm');
+    var crossLabel = '';
+    if (item.isCrossDay && item.crossPart === 'before') crossLabel = ' <small style="color:var(--muted);">(昨晚)</small>';
+    if (item.isCrossDay && item.crossPart === 'after')  crossLabel = ' <small style="color:var(--muted);">(今晨)</small>';
+    detailsHtml += '<div style="display:flex; gap:12px; font-size:12px; color:var(--muted);' + (i > 0 ? ' margin-top:6px;' : '') + '">' +
+      '<span>😴 ' + sleepTimeStr + '</span>' +
+      '<span>⏰ ' + wakeTimeStr + '</span>' +
+      '<span style="color:var(--text);">' + iDurStr + crossLabel + '</span>' +
+      (item.coins ? '<span style="color:var(--gold);">+' + item.coins + '金</span>' : '') +
+    '</div>';
+  });
+  el.innerHTML =
+    '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+      '<span style="font-size:22px; font-weight:700; color:var(--text);">' + durStr + '</span>' +
+      '<span style="font-size:12px;">睡眠质量：' + quality + '</span>' +
+    '</div>' +
+    detailsHtml +
+    (totalCoins > 0 ? '<div style="margin-top:6px; font-size:12px; color:var(--gold);">总计 +' + totalCoins + ' 金币</div>' : '');
+}
+
 function syncSleepToCheckin() {
   const logs = loadSleepLog();
-  const todayLog = logs.find(l => l.date === today());
-  if (!todayLog) {
+  const todayLogs = logs.filter(l => l.date === today());
+  if (todayLogs.length === 0) {
     showToast('无今日睡眠记录');
     return;
   }
 
-  // 同步入睡时间到打卡页
-  document.getElementById('sleepHour').value = todayLog.sleepH;
-  document.getElementById('sleepMinute').value = todayLog.sleepM;
+  // 同步最新一条的入睡时间到打卡页
+  const latestLog = todayLogs[todayLogs.length - 1];
+  document.getElementById('sleepHour').value = latestLog.sleepH;
+  document.getElementById('sleepMinute').value = latestLog.sleepM;
 
   updatePreview();
+  refreshSleepDuration();
   switchTab('checkin');
-  showToast(`🌙 已同步：入睡 ${String(todayLog.sleepH).padStart(2,'0')}:${String(todayLog.sleepM).padStart(2,'0')}，+${todayLog.coins} 金币`);
+  showToast(`🌙 已同步：入睡 ${String(latestLog.sleepH).padStart(2,'0')}:${String(latestLog.sleepM).padStart(2,'0')}，+${latestLog.coins} 金币`);
 }
 
 function renderSleepHistory() {
@@ -4022,6 +4192,7 @@ displayToday();
 updatePreview();
 initQuotesIfEmpty();
 renderAll();
+refreshSleepDuration();
 initTimer();
 initSleepPage();
 
@@ -4029,21 +4200,128 @@ initSleepPage();
 function exportData() {
   const d = collectAllData();
   const json = JSON.stringify(d, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const fileName = '自律者法典_备份_' + new Date().toISOString().slice(0,10) + '.json';
+
+  // 弹窗展示数据，支持下载+复制
+  var overlay = document.getElementById('exportDataOverlay');
+  if (!overlay) {
+    // 首次创建弹窗
+    overlay = document.createElement('div');
+    overlay.id = 'exportDataOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:16px;font-weight:700;">📤 导出数据</span>' +
+        '<button onclick="document.getElementById(\'exportDataOverlay\').style.display=\'none\'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">方式1：点击下载文件 | 方式2：复制文本后在另一设备粘贴导入</div>' +
+      '<textarea id="exportDataText" readonly style="flex:1;min-height:120px;max-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;resize:none;font-family:monospace;word-break:break-all;"></textarea>' +
+      '<div style="display:flex;gap:10px;margin-top:12px;">' +
+        '<button onclick="downloadExportFile()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;">💾 下载文件</button>' +
+        '<button onclick="copyExportData()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📋 复制文本</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('exportDataText').value = json;
+  overlay.style.display = 'flex';
+}
+
+function downloadExportFile() {
+  var text = document.getElementById('exportDataText').value;
+  var blob = new Blob([text], { type: 'application/json' });
+  var fileName = '自律者法典_备份_' + new Date().toISOString().slice(0,10) + '.json';
+  if (window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, fileName);
+    return;
+  }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
-  a.download = '自律者法典_备份_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = fileName;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('📤 备份文件已下载');
+  setTimeout(function() {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 300);
+  showToast('📤 文件下载中...');
+}
+
+function copyExportData() {
+  var text = document.getElementById('exportDataText').value;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('✅ 已复制到剪贴板，可粘贴到另一设备导入');
+    }).catch(function() {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.getElementById('exportDataText');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    showToast('✅ 已复制到剪贴板');
+  } catch(e) {
+    showToast('❌ 复制失败，请手动长按文本选择复制');
+  }
 }
 
 function importData() {
   const input = document.getElementById('importFileInput');
   if (input) input.click();
+}
+
+// 打开导入弹窗（支持文件选择 + 粘贴文本）
+function openImportModal() {
+  var overlay = document.getElementById('importDataOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'importDataOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:16px;font-weight:700;">📂 导入数据</span>' +
+        '<button onclick="document.getElementById(\'importDataOverlay\').style.display=\'none\'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">方式1：选择备份文件 | 方式2：粘贴从另一设备复制的文本</div>' +
+      '<button onclick="document.getElementById(\'importFileInput\').click(); document.getElementById(\'importDataOverlay\').style.display=\'none\';" style="width:100%;padding:12px;border-radius:10px;border:1px dashed var(--border);background:var(--card2);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:10px;">📁 选择备份文件</button>' +
+      '<textarea id="importDataText" placeholder="或在此粘贴备份数据文本..." style="flex:1;min-height:120px;max-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;resize:none;font-family:monospace;word-break:break-all;"></textarea>' +
+      '<button onclick="importFromText()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;margin-top:10px;">📂 导入文本数据</button>' +
+    '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('importDataText').value = '';
+  overlay.style.display = 'flex';
+}
+
+function importFromText() {
+  var text = document.getElementById('importDataText').value.trim();
+  if (!text) { showToast('请先粘贴备份数据'); return; }
+  try {
+    var data = JSON.parse(text);
+    if (!data || typeof data !== 'object') throw new Error('无效的数据格式');
+    var hasKnown = SYNC_DATA_KEYS.some(function(k) { return data[k] !== undefined; });
+    if (!hasKnown) throw new Error('未识别的备份数据');
+    if (!confirm('导入将覆盖当前本地数据，确定继续？')) return;
+    applyAllData(data);
+    G = loadData();
+    timerAccum = loadTimerAccum();
+    updatePreview(); renderAll();
+    updateSleepView(); renderSleepHistory();
+    refreshSleepDuration();
+    document.getElementById('importDataOverlay').style.display = 'none';
+    showToast('📂 备份数据已导入');
+  } catch(err) {
+    showToast('❌ 导入失败：' + err.message);
+  }
 }
 
 function handleFileImport(event) {
@@ -4080,6 +4358,11 @@ function openSyncModal() {
   m.style.display = 'flex';
   document.getElementById('syncToken').value = localStorage.getItem(SYNC_TOKEN_KEY) || '';
   document.getElementById('syncGistId').value = localStorage.getItem(SYNC_GIST_KEY) || '';
+  // 重置按钮状态（防止disabled残留）
+  var btnPush = document.getElementById('btnPushCloud');
+  var btnPull = document.getElementById('btnPullCloud');
+  if (btnPush) { btnPush.disabled = false; btnPush.textContent = '☁️ 上传到云'; }
+  if (btnPull) { btnPull.disabled = false; btnPull.textContent = '📥 从云下载'; }
   const s = document.getElementById('syncStatus');
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
   const gid = localStorage.getItem(SYNC_GIST_KEY);
@@ -4111,19 +4394,28 @@ async function testSync() {
   const token = document.getElementById('syncToken').value.trim() || localStorage.getItem(SYNC_TOKEN_KEY);
   if (!token) { showToast('请先输入 Token'); return; }
   const s = document.getElementById('syncStatus');
-  s.innerHTML = '<span style="color:#aaa;">⏳ 连接中...</span>';
+  s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 连接中，请稍候...</span>';
+  showToast('⏳ 正在测试连接...');
   try {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
     const resp = await fetch('https://api.github.com/user', {
-      headers: { 'Authorization': 'token ' + token }
+      headers: { 'Authorization': 'token ' + token },
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (resp.ok) {
       const user = await resp.json();
       s.innerHTML = '<span style="color:#55efc4;">✅ 连接成功！用户: ' + user.login + '</span>';
+      showToast('✅ GitHub 连接成功');
     } else {
       s.innerHTML = '<span style="color:#fc5c65;">❌ Token无效 (HTTP ' + resp.status + ')</span>';
+      showToast('❌ Token无效');
     }
   } catch(e) {
-    s.innerHTML = '<span style="color:#fc5c65;">❌ 网络错误: ' + e.message + '</span>';
+    var errMsg = e.name === 'AbortError' ? '连接超时(10秒)，国内网络可能无法访问 GitHub API' : e.message;
+    s.innerHTML = '<span style="color:#fc5c65;">❌ 网络错误: ' + errMsg + '</span>';
+    showToast('❌ 连接失败: ' + errMsg);
   }
 }
 
@@ -4146,69 +4438,108 @@ function applyAllData(data) {
   });
 }
 
-async function pushToCloud() {
-  const token = localStorage.getItem(SYNC_TOKEN_KEY);
-  let gistId = localStorage.getItem(SYNC_GIST_KEY);
-  if (!token) { showToast('请先配置同步 Token'); openSyncModal(); return; }
-
-  const allData = collectAllData();
-  const content = JSON.stringify(allData, null, 2);
-  const s = document.getElementById('syncStatus');
-  if (s) s.innerHTML = '<span style="color:#aaa;">⏳ 上传中...</span>';
+async function pushToCloud(btn) {
+  var s = document.getElementById('syncStatus');
+  var origText = btn ? btn.textContent : '';
+  try {
+    if (s) s.innerHTML = '<span style="color:#f5a623;font-size:15px;">⏳ 开始上传...</span>';
+    if (btn) { btn.textContent = '⏳ 上传中...'; btn.disabled = true; }
+  } catch(e2) {}
 
   try {
-    let url, method, body;
-    const files = { 'codex_data.json': { content } };
+    var token = localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    if (!token) {
+      showToast('请先配置同步 Token');
+      openSyncModal();
+      if (btn) { btn.disabled = false; btn.textContent = '☁️ 上传到云'; }
+      return;
+    }
+
+    var allData = collectAllData();
+    var content = JSON.stringify(allData, null, 2);
+    if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 上传中，请稍候...</span>';
+    showToast('⏳ 正在上传到云端...');
+
+    var url, method, body;
+    var files = { 'codex_data.json': { content: content } };
     if (gistId) {
       url = 'https://api.github.com/gists/' + gistId;
       method = 'PATCH';
-      body = { files };
+      body = { files: files };
     } else {
       url = 'https://api.github.com/gists';
       method = 'POST';
-      body = { description: '自律者法典 - 云端备份', public: false, files };
+      body = { description: '自律者法典 - 云端备份', public: false, files: files };
     }
-    const resp = await fetch(url, {
-      method,
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    var resp = await fetch(url, {
+      method: method,
       headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
+      var err = await resp.json().catch(function() { return {}; });
       throw new Error('HTTP ' + resp.status + (err.message ? ': ' + err.message : ''));
     }
-    const result = await resp.json();
+    var result = await resp.json();
     if (!gistId) {
       gistId = result.id;
       localStorage.setItem(SYNC_GIST_KEY, gistId);
-      const inp = document.getElementById('syncGistId');
+      var inp = document.getElementById('syncGistId');
       if (inp) inp.value = gistId;
     }
     if (s) s.innerHTML = '<span style="color:#55efc4;">✅ 上传成功！Gist: ' + gistId.slice(0,8) + '...</span>';
     showToast('☁️ 云端备份成功');
   } catch(e) {
-    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 上传失败: ' + e.message + '</span>';
-    showToast('❌ 云端上传失败');
+    var errMsg = e.message || '未知错误';
+    if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
+    console.error('[sync] pushToCloud error:', e);
+    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 上传失败: ' + errMsg + '</span>';
+    showToast('❌ 云端上传失败: ' + errMsg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText || '☁️ 上传到云'; }
   }
 }
 
-async function pullFromCloud() {
-  const token = localStorage.getItem(SYNC_TOKEN_KEY);
-  const gistId = localStorage.getItem(SYNC_GIST_KEY);
-  if (!token || !gistId) { showToast('请先完成同步设置'); openSyncModal(); return; }
-
-  const s = document.getElementById('syncStatus');
-  if (s) s.innerHTML = '<span style="color:#aaa;">⏳ 下载中...</span>';
+async function pullFromCloud(btn) {
+  // === 入口确认 ===
+  var s = document.getElementById('syncStatus');
+  var origText2 = btn ? btn.textContent : '';
+  try {
+    if (s) s.innerHTML = '<span style="color:#f5a623;font-size:15px;">⏳ 开始下载...</span>';
+    if (btn) { btn.textContent = '⏳ 下载中...'; btn.disabled = true; }
+  } catch(e2) {}
 
   try {
-    const resp = await fetch('https://api.github.com/gists/' + gistId, {
-      headers: { 'Authorization': 'token ' + token }
+    console.log('[sync] pullFromCloud called');
+    var token = localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    if (!token || !gistId) {
+      showToast('请先完成同步设置');
+      openSyncModal();
+      if (btn) { btn.disabled = false; btn.textContent = '📥 从云下载'; }
+      return;
+    }
+
+    if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 下载中，请稍候...</span>';
+    showToast('⏳ 正在从云端下载...');
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    var resp = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: { 'Authorization': 'token ' + token },
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const gist = await resp.json();
-    const file = gist.files['codex_data.json'];
+    var gist = await resp.json();
+    var file = gist.files['codex_data.json'];
     if (!file || !file.content) throw new Error('云端无数据文件');
-    const cloudData = JSON.parse(file.content);
+    var cloudData = JSON.parse(file.content);
 
     applyAllData(cloudData);
 
@@ -4221,8 +4552,14 @@ async function pullFromCloud() {
     timerAccum = loadTimerAccum(); renderTimerAccum();
     updateSleepView(); renderSleepHistory();
   } catch(e) {
-    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + e.message + '</span>';
-    showToast('❌ 云端下载失败');
+    var errMsg = e.message || '未知错误';
+    if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
+    console.error('[sync] pullFromCloud error:', e);
+    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + errMsg + '</span>';
+    showToast('❌ 云端下载失败: ' + errMsg);
+
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText2 || '📥 从云下载'; }
   }
 }
 
@@ -5299,10 +5636,6 @@ function saveManualSleep() {
     logs[_editingSleepIdx] = { date: date, sleepH: sleepH, sleepM: sleepM, wakeH: wakeH, wakeM: wakeM, durationMin: durationMin, coins: coins, manual: true };
     showToast('✅ 已更新 ' + date + ' 的睡眠记录');
   } else {
-    if (logs.find(function(l) { return l.date === date; })) {
-      showToast('该日期已有睡眠记录，请使用编辑功能');
-      return;
-    }
     logs.push({ date: date, sleepH: sleepH, sleepM: sleepM, wakeH: wakeH, wakeM: wakeM, durationMin: durationMin, coins: coins, manual: true });
     showToast('✅ 已添加 ' + date + ' 的睡眠记录');
   }
@@ -5333,12 +5666,12 @@ var INITIAL_QUOTES = [
   {text: "闹钟一响就起床。做一个雷厉风行的人。", scene: "morning"},
   {text: "希望获得谁的认可，就被谁控制。我不想再获得其他人的认可。我想获得自己对自己的认可。"},
   {text: "学习时，尽可能地加入自己的思考和理解。"},
-  {text: "怎么拆分一个句子? 1.属于五大基本句型中的哪一类? 2.句子的各部分在句子中，分别作为什么结构? (比如，在\"The ethical judgments of the Supreme Court justices have become an important issue recently.\"这个句子中，\"The ethical judgments\"作主语，\"of the Supreme Court justices\"作主语\"The ethical judgments\"的后置定语，\"have become\"作动词，\"an important issue\"作补语，\"recently\"作状语。 3.句子的时态是什么? 4.句子中有哪些可以积累的词组? 5.句子中生词的词根词缀是什么? 6.把句子翻译成中文，再对照中文翻译成英文，进行中英互译。"},
+  {text: '怎么拆分一个句子? 1.属于五大基本句型中的哪一类? 2.句子的各部分在句子中，分别作为什么结构? (比如，在"The ethical judgments of the Supreme Court justices have become an important issue recently."这个句子中，"The ethical judgments"作主语，"of the Supreme Court justices"作主语"The ethical judgments"的后置定语，"have become"作动词，"an important issue"作补语，"recently"作状语。 3.句子的时态是什么? 4.句子中有哪些可以积累的词组? 5.句子中生词的词根词缀是什么? 6.把句子翻译成中文，再对照中文翻译成英文，进行中英互译。'},
   {text: "1.想要早睡，关键是17:30~22:30这5个小时怎么过。 2.抓紧时间工作，不加班。到点赶紧去运动。 3.运动后迅速吃晚饭、洗澡。 4.20:40~21:40学习。让身体平静下来。 5.确保22:30~23:00这个时间段躺在床上，放空大脑，专注于呼吸，闭目养神，休息。如果23:00还没睡着，起来学习，不要做其他的。学到困得睁不开眼再睡，但不晚于前一天入睡时间或近7天平均入睡时间(困得话以较早一个为准，不困得话以较晚一个为准)。 6.我觉得我是睡得着的，只是有时候作息不规律，有时候喝多了咖啡，根据以往的经验，大概一周之内能调整过来。"},
   {text: "作息规律化。 每天都按相同的作息时间睡觉、起床、学习、工作、饮食、运动等。 不能因为自己状态不好选择不做，这样只会陷入恶性循环。 不管状态怎么样，该干什么干什么。"},
   {text: "每天最重要的两件事:1.学习5分钟C语言;2.早睡。 其他的事情都可以放一放。"},
   {text: "其他人的言语，或者态度，反映了他的某种目的，比如: 1.发泄情绪: 2.试图恶意攻击并达到削弱你的目的; 3.试图沟通并达到某种诉求等等。 处理方式: 1.直接无视，你的时间和精力非常宝贵，要放在重要的事情上。 2.听取建议，行为上要改进，如果是不太容易纠正的陋习，最好做个记录，逐步完善。 3.不管说什么，做什么，都要注意，你的目标是什么，诉求是什么。你做出的这些言行想要达到的目标是什么，诉求是什么。你是想让对方改变想法?想让对方改变行为?或者你的话主要目的不是对着对方说，而是让其他人听到看到?"},
-  {text: "\"一个意外的收获: 在学习这份报告的过程中，我对恶意和差评有了全新的理解。过去我对莫名其妙的恶意，态度是\"不听不看不回应\"，用无视来\"饿死\"恶意。 这个态度让我活得很轻松。但是，这当然也让我回避差评。心态上还是消极的。 最近，我突然像被佛祖推着肩膀换了一个角度: 如果站在对方那一边 当他无论出于什么动机发出负面信息时，他得到了什么? 也许是情绪压力的释放?也许是一种\"我比你高明\"的感觉? 假设真的如此，那么，我和我的内容，是不是在某种意义上帮到了他? 想到这里，咦 突然感到功德池里的水，荡漾起来了呢。 从此，不仅不畏惧不回避了，反而还有点窃喜。\""},
+  {text: '"一个意外的收获: 在学习这份报告的过程中，我对恶意和差评有了全新的理解。过去我对莫名其妙的恶意，态度是"不听不看不回应"，用无视来"饿死"恶意。 这个态度让我活得很轻松。但是，这当然也让我回避差评。心态上还是消极的。 最近，我突然像被佛祖推着肩膀换了一个角度: 如果站在对方那一边 当他无论出于什么动机发出负面信息时，他得到了什么? 也许是情绪压力的释放?也许是一种"我比你高明"的感觉? 假设真的如此，那么，我和我的内容，是不是在某种意义上帮到了他? 想到这里，咦 突然感到功德池里的水，荡漾起来了呢。 从此，不仅不畏惧不回避了，反而还有点窃喜。"'},
   {text: "围绕睡眠、运动、饮食、工作、学习这5个方面生活，其他能减则减。做减法不做加法。"},
   {text: "把生活中的事情变成小关卡和小挑战，使之具有趣味性。"},
   {text: "专注:一次只做一件事"},
@@ -5348,7 +5681,7 @@ var INITIAL_QUOTES = [
   {text: "品尝并感受当下的这种感觉"},
   {text: "靠大目标给自己带来成就感和掌控感是不行的,靠小目标带来成就感和掌控感。 多给自己来点1分钟或者几分钟就能完成的小目标，通过这种方式获得成就感和掌控感。"},
   {text: "不八卦，八卦非常浪费时间。"},
-  {text: "觉察到走神却拉不回来，是因为\"觉察\"和\"行动\"之间缺了一座\"低能耗\"的桥。 复位策略:最小启动 问自己:\"接下来30秒，我能做的最小动作是什么?\" x\"我要继续写报告。\"(压力大) √\"我打开文档，把光标移到下一行。\"(可执行) 先做这个\"小到不可能失败\"的动作，而不是直接面对任务。 我注意到注意力飘走了，现在带它回来。"},
+  {text: '觉察到走神却拉不回来，是因为"觉察"和"行动"之间缺了一座"低能耗"的桥。 复位策略:最小启动 问自己:"接下来30秒，我能做的最小动作是什么?" x"我要继续写报告。"(压力大) √"我打开文档，把光标移到下一行。"(可执行) 先做这个"小到不可能失败"的动作，而不是直接面对任务。 我注意到注意力飘走了，现在带它回来。'},
   {text: "当计划中断时:1.根据突发事件占用的时长，相应推后原计划(提前预留缓冲时间);2.抄1句《共产党宣言》收心。"},
   {text: "有些小挫折小坎坷是非常正常的。就是在不断踩坑中不断改进呀。 这次犯错了，记下来，想想下回怎么改正过来。 又不是杀人放火的错误，没啥大不了的， 这次不行下次换个姿势再试试呗。"},
   {text: "当下这一分钟，快快乐乐地、充满成就感地过。"},
@@ -5357,7 +5690,7 @@ var INITIAL_QUOTES = [
   {text: "凡事发生皆有利于我"},
   {text: "1.不主动找别人; 2.不说话或者尽量少说话; 3.言多必失，只在必要的时候说话，不必要的时候什么也别说; 4.闲聊非常浪费时间，你的时间要用来做更重要的事。"},
   {text: "1.想想《我为你洒下月光》中的群，她是如何在混乱的环境中学习的。 2.掌握快速切换的能力，提高时间的利用率。 3.抗干扰能力在锻炼中提升。"},
-  {text: "建立\"复位庆祝\"(针对干扰) 动作:每次被干扰后成功回到任务，对自己说一句\"漂亮，又回来了!\"(甚至可以打个勾)。 原理:把\"被干扰-复位\"这个原本让你烦躁的过程，变成一种可被奖励的积极行为。\" 锻炼自己快速收心的能力"},
+  {text: '建立"复位庆祝"(针对干扰) 动作:每次被干扰后成功回到任务，对自己说一句"漂亮，又回来了!"(甚至可以打个勾)。 原理:把"被干扰-复位"这个原本让你烦躁的过程，变成一种可被奖励的积极行为。" 锻炼自己快速收心的能力'},
   {text: "达不到理想状态没关系，只需靠近理想状态。"},
   {text: "想玩乐的时候告诉自己:最痛苦的不是失败，而是我本可以。"},
   {text: "如果想娱乐一下的话，要提前安排时间。 不占用睡眠时间娱乐，睡眠是排在第一位的。"},
@@ -5382,8 +5715,8 @@ var INITIAL_QUOTES = [
   {text: "将军赶路，不追小兔。生活中鸡毛蒜皮的事多得很，什么都去在意只会什么都干不成。抓核心。"},
   {text: "如果你内心所有欲望都能做到不依赖自己以外的任何人，那你便是自己的主人，也将因此获得真正的自由。斯多葛学派的哲学就是让你掌控自己的人生，懂得在自己有能力完成或改变的事情上下功夫，而不要在无能为力的事情上浪费精力。"},
   {text: "斯多葛学派尤其警告我们不要对无法控制的事情做出情绪化的反应。伊壁鸠鲁认为，让我们沮丧的往往不是所处的环境，而是我们对它们所做的判断，比如愤怒就是如此:如果下雨破坏了我们的野餐，我们不应感到愤怒，那是非常愚蠢的做法，因为我们对雨无能为力。如果有人苛待我们，我们往往也会生气，但是要知道，就像无法把雨赶走一样，我们也不能控制或改变苛待我们的人，所以生气同样很愚蠢。"},
-  {text: "总之，把自己的幸福感受寄托在对他人行为的改变上，与将其寄托在天气上没有什么区别，注定毫无结果。伊壁鸠鲁在书中写道:\" 如果有任何我们控制不了的事情，你就要想它与你毫无关系。\""},
-  {text: "\"接受\"是斯多葛学派提出的核心方法:如果你接受了可能发生的\"最坏\"情况，而且只关注自己能做什么，并以积极的方式应对，你就能减少很多情绪上的痛苦。如此一来，情绪带给你的便是激励和力量，而不会将你摧毁。"},
+  {text: '总之，把自己的幸福感受寄托在对他人行为的改变上，与将其寄托在天气上没有什么区别，注定毫无结果。伊壁鸠鲁在书中写道:" 如果有任何我们控制不了的事情，你就要想它与你毫无关系。"'},
+  {text: '"接受"是斯多葛学派提出的核心方法:如果你接受了可能发生的"最坏"情况，而且只关注自己能做什么，并以积极的方式应对，你就能减少很多情绪上的痛苦。如此一来，情绪带给你的便是激励和力量，而不会将你摧毁。'},
   {text: "我生来就是高山而非溪流，我欲于群峰之巅俯视平庸的沟壑。我生来就是人杰而非草芥，我站在伟人之肩藐视卑微的懦夫。"},
   {text: "金屑虽贵，落眼成翳。"},
   {text: "本自无缚，不用求解。"},
@@ -5391,7 +5724,68 @@ var INITIAL_QUOTES = [
   {text: "学习时，尽可能把输入变成输出。 尽可能把所有感官都调动，而不仅仅是眼睛看。 手要写，脑子要思考，耳朵要听，嘴巴要念。"},
   {text: "上天想给你最好礼物的时候，会先让你腾空双手。"},
   {text: "放松点。生活不会因为你心弦紧绷,而事事顺遂。"},
-  {text: "与人交往，要做好两个前提准备:一是要坚信对方是好人，二是要明了对方是凡人。是好人，就必然有向善、行善的需求;是凡人，他的情绪和意识就必然有善变、不稳定的一面。在这两个前提下与人交往，必然会超脱和豁达，也会更具备与人方便的能力。"}
+  {text: "与人交往，要做好两个前提准备:一是要坚信对方是好人，二是要明了对方是凡人。是好人，就必然有向善、行善的需求;是凡人，他的情绪和意识就必然有善变、不稳定的一面。在这两个前提下与人交往，必然会超脱和豁达，也会更具备与人方便的能力。"},
+  {text: "把工作里能接触到的一切资源为我所用：沉淀我的能力，优化我的履历，布局我的未来，事儿真做砸了也是花老板的钱。"},
+  {text: "不钻牛角尖，解决不了的问题先写下来。事缓则圆。"},
+  {text: "塞翁失马，焉知非福。有更好的机会在前面等着你。"},
+  {text: "无论别人对你说什么，你都无动于衷。不要被愤怒冲昏了头脑。学会计算，怎样对你最有利。"},
+  {text: "不抛弃，不放弃。向人类轻步兵的巅峰致敬。"},
+  {text: "网瘾主要出现在晚上，之前为了掩盖疲劳、压力等不适感将疲劳与网瘾联系了起来。躺下听冥想相关的书。躺半个小时睡不着再起来学习半个小时。如此循环直到能够睡着。睡不着没关系，躺着就行。", scene: "evening"},
+  {text: "迎难而上，直面困难。"},
+  {text: "保持情绪稳定，学会算账，当下怎样做是对自己最有利的。"},
+  {text: "程序设计之初，就是为了吸引你的注意力，挑起你的情绪。时间宝贵，不要被电子产品控制，应该是你来控制电子产品，你来作主导。"},
+  {text: "很多事情是不能一蹴而就的，要有耐心，徐徐图之。"},
+  {text: "积极乐观，耐心平和。"},
+  {text: "疲惫的时候，一定不要玩手机。迅速洗漱好睡觉。", scene: "evening"},
+  {text: "对所有事情都持开放、包容、接纳的态度。一切发生皆于我有利。"},
+  {text: "快乐多一点，笑容多一点。"},
+  {text: "欲成大树，莫与草争。"},
+  {text: "惯性：越玩手机越想玩手机，越学习越想学习。"},
+  {text: "在学习时如何吸引自己的注意力？设置悬念，向自己提问。加入自己的思考，自己给自己举例，自己给自己讲课。补充相关内容，自己加备注。"},
+  {text: "希望把时间花在什么事情上呢？把时间花在什么事情上不会后悔呢？"},
+  {text: "如果向每一只朝你吠叫的狗扔石头，那你永远也到达不了终点。"},
+  {text: "爱和善意，比苛责和鞭策更能帮助我们成长。"},
+  {text: "掌握，需要大量的重复、练习和实践。"},
+  {text: "怎么夸人？给人自己夸自己的口子：1.说优点；2说感受；3.请教他是怎么做到的。"},
+  {text: "注意力放在最重要的事情上，不被无关紧要的事情带着跑。"},
+  {text: "千言不如一默。话要想三遍才说出口，不要张嘴就来。"},
+  {text: "知其然也要知其所以然。做练习的时候要写思路，不要瞎猜。做选择题的时候，顺便写一写为什么选这个选项。"},
+  {text: "有自己的思考和体会，学到的东西才能真正变成自己的。"},
+  {text: "能念出声尽量念出声，这样更专注。不能念出声动口型也可以。"},
+  {text: '怎么样可以变得更专注？1.意识到自己走神了，就把自己拉回来。2.多做这种"走神-拉回"练习。比如：放慢呼吸，注意力集中在呼吸上，走神了就拉回来。3.养成好的生活习惯，好好睡觉。精力充沛的时候也更专注。'},
+  {text: "不喂养那只流浪猫，它就不会再出现在你的门前。"},
+  {text: "理解了和看多了死记硬背下来的感觉是不一样的。理解与死记硬背的区别在于：1.理解了就很容易举出例子来，并且可以延伸发散开去；死记硬背只能照着原搬不动地写下来。2.理解了就容易记忆，花不了多久就能背下来且不容易忘；死记硬背需要重复很多遍才能记下来，比较费时间，并且相对更容易忘。"},
+  {text: "输出比输入更容易进入心流状态，学习的时候尽可能把要学的内容转化为输出。"},
+  {text: "脑中开启屏蔽器，与无关紧要的自动屏蔽掉。"},
+  {text: "一个概念，完整地看一遍，再把它整个写下来。中间如果有遗忘就再看一眼。"},
+  {text: "对于大纲中的概念，要能举出例子（或例题）。"},
+  {text: "数学概念、定理相当于是工具，各种数学考试考的是对工具使用的熟练程度。"},
+  {text: "书要边看边写读后感。尽可能把输入变成输出。"},
+  {text: "把自己当成老师，怎么讲学生才能听懂？知识点拆分。复杂知识点拆分成简单知识点。拆分到最基础。基础的掌握了，再一点点复合，用来解决复杂问题。"},
+  {text: "理解了就复述一遍。"},
+  {text: "分辨清哪些是外在的诱惑，哪些是你真正想要的。"},
+  {text: "坚决不再凑单了。时间比省下来的那点小钱宝贵多了。需要再买，时间宝贵。"},
+  {text: "到了晚上，睡觉前，可能会有一阵特别想玩手机。不要玩，玩了一定会后悔。有这种感觉的时候，躺下，闭眼，跟着有声书一起冥想。", scene: "evening"},
+  {text: "拥抱痛苦，为所当为。这才是多巴胺掩盖下的真正快乐。"},
+  {text: "爱是最伟大的力量。"},
+  {text: "一个积极乐观的心态真的太重要啦！用积极的语言与自己对话。"},
+  {text: "在任何情况下，任何人都能凭借精神的力量顽强地捍卫和坚守自己的内在自由。"},
+  {text: "每一次挫折都是一次改进的契机，是包装过的礼物。"},
+  {text: "我职位低，大家都不愿同我来往。我的一项任务是登记来图书馆看报纸的读者姓名，但他们大多没把我当成一个活生生的人。在那些来图书馆阅读的人中，我认出了一些新文化运动著名领袖，像傅斯年、罗家伦等，这些人我都非常感兴趣。我试图与他们谈谈政治和文化问题，但他们都很忙，没空听一个图书馆助理馆员讲南方土话。不过我没有气馁。我加入了哲学会和新闻学会，目的是在北大旁听课程。"},
+  {text: "只管往前跑，什么都不要想。我拥有一目十行的能力、超强的记忆力、非常棒的理解能力、举一反三的学习能力、有智慧、有勇气、敢于面对一切挫折和困难、敢于为自己争取想要的幸福生活。"},
+  {text: '网瘾忍一忍就过去了，玩了肯定会后悔。最难受的不是失败，而是"我本可以"。'},
+  {text: "每次吃到的资源，都是在增加你的独特性，把你从一个普通的、随处可寻的零件，变成不那么好找替代品的高价值零件。虽然还是零件，但中枢轴承的待遇和外围齿轮的待遇终究是不一样的。"},
+  {text: "和时间赛跑。"},
+  {text: "吓倒我的，只是幻象。"},
+  {text: "脾气大小和内心强弱是成反比的。脾气越大的人，反而内心越虚弱。\n因为他的脾气来自于内心的不安，面对问题他没有或只有很少的解决办法，只好用发脾气来掩饰自己的无能，甚至诉诸武力，试图靠暴力解决一切问题。\n当一个人面对问题至少有三种以上的解决方案时，他的内心自然就淡定了，不需要试图用脾气来解决。\n脾气越平和的人，内心越强大。\n平和不是懦弱，懦弱是畏惧、害怕的体现，试图通过逃避来躲开问题。\n平和是不卑不亢，淡定安然，是泰山崩于前而不惊，是在紧急情况下仍然能理智思考问题而不被情绪冲昏头脑，是勇敢面对一切困难，是敢于接受新的机遇和挑战。"},
+  {text: "开心也是一天，不开心也是一天，干嘛不开心得过呢？每天都开开心心。"},
+  {text: "没睡好也不要紧。只要醒着，就把效率打到最高。"},
+  {text: "一疲劳就容易崩。尽量避免疲劳。实在无法避免的时候，就想想马旭。"},
+  {text: "很多事情无法控制，把自己能力范围之内的做好就行。"},
+  {text: '放弃和认命是一条没有尽头的"下坡路"。请记住，在任何一个你没有察觉的时刻，包括现在，通过行动去改变命运的机会，一直都存在。'},
+  {text: "人不是被情绪摆布的脆弱存在。"},
+  {text: "戒手机就像戒烟戒酒，会有戒断反应。把最难熬的那一小会儿忍过去就不想玩了，慢慢就彻底戒掉了。"},
+  {text: "分清主次。不要被不重要且不紧急的事情占用太多时间。"}
 ];
 
 function getMonday(date) {
@@ -5415,7 +5809,7 @@ function saveQuotesData(data) {
   localStorage.setItem('codex_quotes_v1', JSON.stringify(data));
 }
 
-var QUOTES_VERSION = 4; // 格言版本号，更新内容时递增
+var QUOTES_VERSION = 5; // 格言版本号，更新内容时递增
 
 function initQuotesIfEmpty() {
   var data = getQuotesData();
