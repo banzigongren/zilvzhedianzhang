@@ -2051,8 +2051,8 @@
       <button class="btn" onclick="testSync()" style="flex:1;background:linear-gradient(135deg,#1a3a2a,#0f2a1a);color:#55efc4;">🔗 测试连接</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn" onclick="pushToCloud()" style="flex:1;">☁️ 上传到云</button>
-      <button class="btn" onclick="pullFromCloud()" style="flex:1;">📥 从云下载</button>
+      <button class="btn" onclick="pushToCloud(this)" style="flex:1;">☁️ 上传到云</button>
+      <button class="btn" onclick="pullFromCloud(this)" style="flex:1;">📥 从云下载</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">📤 导出数据</button>
@@ -4433,7 +4433,7 @@ function applyAllData(data) {
   });
 }
 
-async function pushToCloud() {
+async function pushToCloud(btn) {
   console.log('[sync] pushToCloud called');
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
   let gistId = localStorage.getItem(SYNC_GIST_KEY);
@@ -4446,10 +4446,7 @@ async function pushToCloud() {
   if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 上传中，请稍候...</span>';
   showToast('⏳ 正在上传到云端...');
 
-  // 按钮禁用防重复点击
-  try {
-    var btn = window.event && window.event.target;
-  } catch(e) { var btn = null; }
+  // 按钮禁用防重复点击（btn通过onclick(this)传入）
   var origText = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 上传中...'; }
 
@@ -4499,7 +4496,7 @@ async function pushToCloud() {
   }
 }
 
-async function pullFromCloud() {
+async function pullFromCloud(btn) {
   console.log('[sync] pullFromCloud called');
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
   const gistId = localStorage.getItem(SYNC_GIST_KEY);
@@ -4509,11 +4506,9 @@ async function pullFromCloud() {
   if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">⏳ 下载中，请稍候...</span>';
   showToast('⏳ 正在从云端下载...');
 
-  try {
-    var btn2 = window.event && window.event.target;
-  } catch(e) { var btn2 = null; }
-  var origText2 = btn2 ? btn2.textContent : '';
-  if (btn2) { btn2.disabled = true; btn2.textContent = '⏳ 下载中...'; }
+  // 按钮禁用防重复点击（btn通过onclick(this)传入）
+  var origText2 = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 下载中...'; }
 
   try {
     var controller = new AbortController();
@@ -4546,7 +4541,7 @@ async function pullFromCloud() {
     if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + errMsg + '</span>';
     showToast('❌ 云端下载失败: ' + errMsg);
   } finally {
-    if (btn2) { btn2.disabled = false; btn2.textContent = origText2 || '📥 从云下载'; }
+    if (btn) { btn.disabled = false; btn.textContent = origText2 || '📥 从云下载'; }
   }
 }
 
