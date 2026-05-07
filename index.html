@@ -1510,8 +1510,17 @@
       <span style="color:#a29bfe;" id="wallet-points">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>积分价值</span>
+      <span style="color:#a29bfe;" id="wallet-points-cny">≈ ¥0.00</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
       <span>补打卡券</span>
       <span style="color:var(--teal);" id="wallet-coupons">0 张</span>
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px;">
+      <span style="color:var(--gold); font-weight:600;">💰 总资产</span>
+      <span style="color:var(--gold); font-size:20px; font-weight:700;" id="wallet-total-cny">≈ ¥0.00</span>
     </div>
   </div>
 
@@ -3079,10 +3088,16 @@ function renderTimeBar(label, val, max, color) {
 
 // ===== 钱包 =====
 function renderWallet() {
+  var coinsCny = G.coins * 1;              // 1金币 = 1元
+  var pointsCny = G.points * 0.2;          // 1积分 = 0.2元
+  var totalCny = coinsCny + pointsCny;     // 总资产
+
   document.getElementById('wallet-coins').textContent = G.coins.toFixed(0);
-  document.getElementById('wallet-cny').textContent   = `≈ ¥${(G.coins).toFixed(2)}`;
+  document.getElementById('wallet-cny').textContent   = '≈ ¥' + coinsCny.toFixed(2);
   document.getElementById('wallet-points').textContent = G.points;
+  document.getElementById('wallet-points-cny').textContent = '≈ ¥' + pointsCny.toFixed(2);
   document.getElementById('wallet-coupons').textContent = G.coupons + ' 张';
+  document.getElementById('wallet-total-cny').textContent = '≈ ¥' + totalCny.toFixed(2);
 
   const el = document.getElementById('spendHistory');
   if (G.spends.length === 0) {
