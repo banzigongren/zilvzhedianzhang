@@ -4447,11 +4447,15 @@ async function pushToCloud(btn) {
   } catch(e2) {}
 
   try {
-    var token = localStorage.getItem(SYNC_TOKEN_KEY);
-    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    // 优先从输入框取值，同时自动保存配置
+    var tokenEl = document.getElementById('syncToken');
+    var gistEl = document.getElementById('syncGistId');
+    var token = (tokenEl ? tokenEl.value.trim() : '') || localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = (gistEl ? gistEl.value.trim() : '') || localStorage.getItem(SYNC_GIST_KEY);
+    if (token && tokenEl) { localStorage.setItem(SYNC_TOKEN_KEY, token); }
+    if (gistId && gistEl) { localStorage.setItem(SYNC_GIST_KEY, gistId); }
     if (!token) {
-      showToast('请先配置同步 Token');
-      openSyncModal();
+      showToast('请先输入 GitHub Token');
       if (btn) { btn.disabled = false; btn.textContent = '☁️ 上传到云'; }
       return;
     }
@@ -4515,12 +4519,15 @@ async function pullFromCloud(btn) {
   } catch(e2) {}
 
   try {
-    console.log('[sync] pullFromCloud called');
-    var token = localStorage.getItem(SYNC_TOKEN_KEY);
-    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    // 优先从输入框取值，同时自动保存配置
+    var tokenEl = document.getElementById('syncToken');
+    var gistEl = document.getElementById('syncGistId');
+    var token = (tokenEl ? tokenEl.value.trim() : '') || localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = (gistEl ? gistEl.value.trim() : '') || localStorage.getItem(SYNC_GIST_KEY);
+    if (token && tokenEl) { localStorage.setItem(SYNC_TOKEN_KEY, token); }
+    if (gistId && gistEl) { localStorage.setItem(SYNC_GIST_KEY, gistId); }
     if (!token || !gistId) {
-      showToast('请先完成同步设置');
-      openSyncModal();
+      showToast('请先输入 Token 和 Gist ID');
       if (btn) { btn.disabled = false; btn.textContent = '📥 从云下载'; }
       return;
     }
