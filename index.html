@@ -1960,36 +1960,6 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><span class="icon">🕐</span>选择入睡时间</div>
-      <div class="sleep-time-btns">
-        <div class="sleep-time-opt" onclick="selectSleepTime(22,0)" id="sopt-22-0">
-          <div class="sleep-opt-time">22:00</div>
-          <div class="sleep-opt-coins">+10 金币</div>
-        </div>
-        <div class="sleep-time-opt" onclick="selectSleepTime(22,30)" id="sopt-22-30">
-          <div class="sleep-opt-time">22:30</div>
-          <div class="sleep-opt-coins">+10 金币</div>
-        </div>
-        <div class="sleep-time-opt" onclick="selectSleepTime(23,0)" id="sopt-23-0">
-          <div class="sleep-opt-time">23:00</div>
-          <div class="sleep-opt-coins">+8 金币</div>
-        </div>
-        <div class="sleep-time-opt" onclick="selectSleepTime(23,30)" id="sopt-23-30">
-          <div class="sleep-opt-time">23:30</div>
-          <div class="sleep-opt-coins">+6 金币</div>
-        </div>
-      </div>
-      <div class="input-group" style="margin-bottom:0;">
-        <label style="font-size:12px; color:var(--muted);">或自定义时间</label>
-        <div class="time-picker">
-          <select id="sleepInHour"></select>
-          <span class="time-sep">:</span>
-          <select id="sleepInMinute"></select>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
       <div class="rule-box" style="background: rgba(100,120,255,0.06); border-color: rgba(100,120,255,0.2);">
         <span class="hl" style="color:#a0b4ff;">🔒 锁定规则</span><br>
         • 点击「开始睡觉」后，全屏锁定覆盖<br>
@@ -3930,40 +3900,8 @@ function saveSleepLog(logs) {
 
 let sleepState = loadSleepState();
 let sleepLockInterval = null;
-let selectedSleepTime = { h: 22, m: 30 };
 
 function initSleepPage() {
-  // 填充自定义时间选择器
-  const hSel = document.getElementById('sleepInHour');
-  const mSel = document.getElementById('sleepInMinute');
-  for (let h = 20; h <= 24; h++) {
-    const o = document.createElement('option');
-    o.value = h % 24;
-    o.textContent = String(h % 24).padStart(2, '0');
-    hSel.appendChild(o);
-  }
-  for (let m = 0; m < 60; m += 1) {
-    const o = document.createElement('option');
-    o.value = m;
-    o.textContent = String(m).padStart(2, '0');
-    mSel.appendChild(o);
-  }
-
-  // 默认选中22:30
-  selectSleepTime(22, 30);
-
-  // 监听自定义时间变化
-  hSel.addEventListener('change', function() {
-    clearSleepTimeSelection();
-    selectedSleepTime.h = parseInt(this.value);
-    selectedSleepTime.m = parseInt(mSel.value);
-  });
-  mSel.addEventListener('change', function() {
-    clearSleepTimeSelection();
-    selectedSleepTime.h = parseInt(hSel.value);
-    selectedSleepTime.m = parseInt(this.value);
-  });
-
   // 如果上次正在睡觉（页面刷新了），恢复锁定
   if (sleepState.isSleeping && sleepState.sleepTs) {
     showSleepLock();
@@ -3973,30 +3911,13 @@ function initSleepPage() {
   updateSleepView();
 }
 
-function selectSleepTime(h, m) {
-  selectedSleepTime = { h, m };
-  // 更新UI选中状态
-  clearSleepTimeSelection();
-  const key = `sopt-${h}-${m}`;
-  const el = document.getElementById(key);
-  if (el) el.classList.add('selected');
-
-  // 同步到自定义选择器
-  document.getElementById('sleepInHour').value = h;
-  document.getElementById('sleepInMinute').value = m;
-}
-
-function clearSleepTimeSelection() {
-  document.querySelectorAll('.sleep-time-opt').forEach(e => e.classList.remove('selected'));
-}
-
 function startSleep() {
   const now = new Date();
   sleepState = {
     isSleeping: true,
     sleepTs: now.getTime(),
-    sleepH: selectedSleepTime.h,
-    sleepM: selectedSleepTime.m,
+    sleepH: now.getHours(),
+    sleepM: now.getMinutes(),
   };
   saveSleepState(sleepState);
   showSleepLock();
