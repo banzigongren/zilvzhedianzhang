@@ -1788,8 +1788,8 @@
         <span class="sync-val sync-sport"><span id="ts-sport">0</span> 分钟</span>
       </div>
     </div>
-    <button class="btn btn-gold" style="margin-top:12px;" onclick="syncToCheckin()">⬆️ 同步到打卡页面</button>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">将以上累计分钟数填入打卡输入框</div>
+    <button class="btn btn-gold" style="margin-top:12px;" onclick="syncToSchedule()">⬆️ 同步到今日日程时间轴</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">将计时数据更新到今日日程时间轴</div>
   </div>
 
   <!-- 计时记录 -->
@@ -3834,23 +3834,14 @@ function clearTimerLog() {
   showToast('已清空今日计时记录');
 }
 
-function syncToCheckin() {
+function syncToSchedule() {
   if (timerAccum.date !== today()) {
     showToast('无今日计时数据');
     return;
   }
-  // 取当前输入值与计时器值的较大者（不覆盖手动输入的更大值）
-  const curStudy = parseInt(document.getElementById('studyMin').value) || 0;
-  const curWork  = parseInt(document.getElementById('workMin').value)  || 0;
-  const curSport = parseInt(document.getElementById('sportMin').value) || 0;
-
-  document.getElementById('studyMin').value = Math.max(curStudy, timerAccum.study);
-  document.getElementById('workMin').value  = Math.max(curWork,  timerAccum.work);
-  document.getElementById('sportMin').value = Math.max(curSport, timerAccum.sport);
-  updatePreview();
-
-  switchTab('checkin');
-  showToast(`⬆️ 已同步：学习${timerAccum.study}分 工作${timerAccum.work}分 运动${timerAccum.sport}分`);
+  refreshStatsSchedule();
+  switchTab('stats');
+  showToast('📊 已同步到今日日程时间轴');
 }
 
 // ========== 从日程时间轴同步到打卡页 ==========
