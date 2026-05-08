@@ -3192,6 +3192,8 @@ function renderStats() {
   // 渲染日程时间轴
   renderTimelineIn(schedule.segments, 'statsTimelineTrack', 'statsTimelineTicks', '_stats');
   renderLegendIn(schedule.segments, 'statsTimelineLegend', '_stats');
+  // 自动同步日程数据到打卡tab
+  _autoSyncToCheckin(schedule.segments);
 }
 
 function renderTimeBar(label, val, max, color) {
@@ -3746,6 +3748,10 @@ function _commitTimerRecord(tag, note) {
   showToast(`✅ ${MODE_CFG[mode].icon} ${MODE_CFG[mode].label.replace('计时','')} ${mins} 分钟已记录`);
   renderTimerAccum();
   renderTimerLog();
+  // 自动同步到打卡tab并刷新日程时间轴
+  if (timerAccum.date === today()) {
+    refreshStatsSchedule();
+  }
 }
 
 function timerReset() {
@@ -4204,6 +4210,8 @@ function wakeUp() {
   showWakeResult(hrs, mins, sleepH, sleepM, now.getHours(), now.getMinutes(), coins);
   // 刷新打卡页睡眠时长
   refreshSleepDuration();
+  // 自动同步睡眠数据到打卡tab
+  refreshStatsSchedule();
   // 起床后弹出格言警句
   showQuoteModal('morning');
 }
@@ -5507,6 +5515,39 @@ function refreshStatsSchedule() {
   renderLegendIn(schedule.segments, 'statsTimelineLegend', '_stats');
   updateSegSummary(schedule.segments);
   hideSegForm_stats();
+  // 自动同步日程数据到打卡tab
+  _autoSyncToCheckin(schedule.segments);
+}
+
+// 静默版同步：日程时间轴变更后自动更新打卡输入框（不弹toast）
+function _autoSyncToCheckin(segs) {
+  var studyM = 0, workM = 0, sportM = 0, wasteM = 0, funM = 0, dailyM = 0;
+  segs.forEach(function(seg) {
+    var dur = seg.endMin - seg.startMin;
+    if (seg.type === 'study') studyM += dur;
+    else if (seg.type === 'work') workM += dur;
+    else if (seg.type === 'sport') sportM += dur;
+    else if (seg.type === 'waste') wasteM += dur;
+    else if (seg.type === 'fun') funM += dur;
+    else if (seg.type === 'daily') dailyM += dur;
+  });
+  // 从日程睡眠时段同步入睡时间
+  var sleepSegs = segs.filter(function(seg) { return seg.type === 'sleep'; });
+  if (sleepSegs.length > 0) {
+    var firstSleep = sleepSegs[0];
+    var bedHour = Math.floor(firstSleep.startMin / 60) % 24;
+    var bedMin  = firstSleep.startMin % 60;
+    document.getElementById('sleepHour').value   = bedHour;
+    document.getElementById('sleepMinute').value = bedMin;
+  }
+  document.getElementById('studyMin').value = studyM;
+  document.getElementById('workMin').value = workM;
+  document.getElementById('sportMin').value = sportM;
+  document.getElementById('phoneMin').value = wasteM;
+  document.getElementById('funMin').value = funM;
+  document.getElementById('dailyMin').value = dailyM;
+  updatePreview();
+  refreshSleepDuration();
 }
 
 function updateSegSummary(segments) {
