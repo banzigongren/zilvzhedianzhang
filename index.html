@@ -258,6 +258,15 @@
     .cal-day.clickable { cursor: pointer; }
     .cal-day.clickable:active { transform: scale(0.92); }
     .cal-day .cal-coin { font-size: 9px; color: var(--gold); margin-top: 1px; }
+    .cal-mini-bar {
+      display: block; position: relative; width: 100%; height: 4px;
+      background: rgba(255,255,255,0.05); border-radius: 2px;
+      margin-top: 3px; overflow: hidden;
+    }
+    .cal-mini-seg {
+      position: absolute; top: 0; height: 100%; border-radius: 1px;
+      min-width: 1px;
+    }
     .cal-legend { display: flex; gap: 14px; justify-content: center; margin-top: 10px; font-size: 11px; color: var(--muted); }
     .cal-legend-item { display: flex; align-items: center; gap: 4px; }
     .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -3422,6 +3431,18 @@ function renderCalendar() {
     repSet[G.repairedDays[j]] = true;
   }
 
+  // 预生成每日迷你时间轴（缓存）
+  var miniTimelineCache = {};
+  for (var d = 1; d <= 31; d++) {
+    var ds = _calYear + '-' + String(_calMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    if (!(_calYear < 2026 || (_calYear === 2026 && _calMonth < 5) || d > new Date(_calYear, _calMonth, 0).getDate())) {
+      var sch = getDaySchedule(ds);
+      if (sch.segments && sch.segments.length > 0) {
+        miniTimelineCache[ds] = buildMiniTimeline(sch.segments);
+      }
+    }
+  }
+
   // 计算月历网格
   var firstDay = new Date(_calYear, _calMonth - 1, 1);
   var daysInMonth = new Date(_calYear, _calMonth, 0).getDate();
@@ -3436,7 +3457,7 @@ function renderCalendar() {
 
   for (var d = 1; d <= daysInMonth; d++) {
     var dateStr = _calYear + '-' + String(_calMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    // 2026年5月1日之前不显示
+    // 2026年5月1日之前不显示迷你条
     if (_calYear < 2026 || (_calYear === 2026 && _calMonth < 5)) {
       html += '<div class="cal-day">' + d + '</div>';
       continue;
@@ -3445,32 +3466,44 @@ function renderCalendar() {
     var isToday = (dateStr === todayStr);
     var rec = recMap[dateStr];
     var isRepaired = !!repSet[dateStr];
-    var cls = 'cal-day in-month';
-    if (rec) cls += ' checked-in clickable';
-    else if (isRepaired) cls += ' repaired clickable';
+    var cls = 'cal-day in-month clickable';
+    if (rec) cls += ' checked-in';
+    else if (isRepaired) cls += ' repaired';
     if (isToday) cls += ' today';
 
     var coinInfo = '';
     if (rec) coinInfo = '<span class="cal-coin">+' + rec.coinEarned + '</span>';
 
-    var onclick = '';
-    if (rec) onclick = ' onclick="calDayClick(\'' + dateStr + '\')"';
-    else if (isRepaired) onclick = ' onclick="calDayClick(\'' + dateStr + '\')"';
+    // 迷你时间轴
+    var miniBar = miniTimelineCache[dateStr] || '';
 
-    html += '<div class="' + cls + '"' + onclick + '>' + d + coinInfo + '</div>';
+    html += '<div class="' + cls + '" onclick="calDayClick(\'' + dateStr + '\')">' + d + coinInfo + miniBar + '</div>';
   }
 
   document.getElementById('calGrid').innerHTML = html;
 }
 
-function calDayClick(dateStr) {
-  // 点击日期：打开日程弹窗（如有打卡记录则显示详情）
-  var rec = G.records.find(function(r) { return r.date === dateStr; });
-  if (rec) {
-    openScheduleModal(dateStr);
-  } else {
-    openScheduleModal(dateStr);
+// 构建迷你时间轴色条HTML
+function buildMiniTimeline(segments) {
+  if (!segments || segments.length === 0) return '';
+  var bars = '';
+  for (var i = 0; i < segments.length; i++) {
+    var seg = segments[i];
+    if (seg.type === 'unknown') continue; // 跳过"待补充"段
+    var cfg = SCHEDULE_TYPE_CFG[seg.type];
+    if (!cfg) continue;
+    var left = (seg.startMin / 1440) * 100;
+    var width = ((seg.endMin - seg.startMin) / 1440) * 100;
+    if (width < 1) continue; // 太窄不显示
+    bars += '<span class="cal-mini-seg" style="left:' + left + '%;width:' + width + '%;background:' + cfg.color + ';"></span>';
   }
+  if (!bars) return '';
+  return '<span class="cal-mini-bar">' + bars + '</span>';
+}
+
+function calDayClick(dateStr) {
+  // 点击日期：打开日程弹窗，查看当日日程时间轴
+  openScheduleModal(dateStr);
 }
 
 // ===== 历史 - 加入编辑/删除 =====
