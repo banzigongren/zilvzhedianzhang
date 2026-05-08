@@ -1826,20 +1826,20 @@
 
     <div class="rule-box">
       <b>🟣 学分（学习）</b><br>
-      每专注学习1分钟 = <span class="hl">2学分</span><br>
-      学习附加分 = 学习分钟数 - 120（需 > 120分钟才生效）
+      每专注学习1分钟 = <span class="hl">1学分</span><br>
+      学习附加分 = 学习分钟数 - 240（需 > 240分钟才生效）
     </div>
 
     <div class="rule-box">
       <b>🟢 工分（工作）</b><br>
-      每专注工作1分钟 = <span class="hl">2工分</span><br>
-      工作附加分 = 工作分钟数 - 360（需 > 360分钟才生效）
+      每专注工作1分钟 = <span class="hl">1工分</span><br>
+      工作附加分 = 工作分钟数 - 720（需 > 720分钟才生效）
     </div>
 
     <div class="rule-box">
       <b>🔴 健康分（运动）</b><br>
-      每有效运动1分钟 = <span class="hl">2健康分</span><br>
-      运动附加分 = 运动分钟数 - 5（需 > 5分钟才生效）
+      每有效运动1分钟 = <span class="hl">1健康分</span><br>
+      运动附加分 = 运动分钟数 - 10（需 > 10分钟才生效）
     </div>
   </div>
 
@@ -2486,14 +2486,14 @@ function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
   const baseScore = Math.max(0, 1440 - wasteM - studyM - workM - sportM);
   const base = baseScore;
 
-  const studyScore = studyM * 2;
-  const studyBonus = studyM > 120 ? (studyM - 120) : 0;
+  const studyScore = studyM;
+  const studyBonus = studyM > 240 ? (studyM - 240) : 0;
 
-  const workScore = workM * 2;
-  const workBonus = workM > 360 ? (workM - 360) : 0;
+  const workScore = workM;
+  const workBonus = workM > 720 ? (workM - 720) : 0;
 
-  const sportScore = sportM * 2;
-  const sportBonus = sportM > 5 ? (sportM - 5) : 0;
+  const sportScore = sportM;
+  const sportBonus = sportM > 10 ? (sportM - 10) : 0;
 
   const total = base + studyScore + workScore + sportScore;
   return { base, studyScore, studyBonus, workScore, workBonus, sportScore, sportBonus, total };
@@ -2509,11 +2509,11 @@ function calcSleepCoins(h, m) {
 
 // ========== 每日称号计算 ==========
 function calcDailyTitles(studyM, workM, sportM, sleepH, sleepM) {
-  const morningOrder = workM >= 90;       // 晨序员：180工分=90分钟
-  const dayBalancer = studyM >= 30;       // 日衡者：60学分=30分钟
-  const deepCultivator = workM >= 90;     // 深耕师：180工分=90分钟
-  const duskFerry = sportM >= 5;          // 暮渡人：10健康分=5分钟
-  const nightLaw = studyM >= 30;          // 夜律者：60学分=30分钟
+  const morningOrder = workM >= 180;      // 晨序员：180工分=180分钟
+  const dayBalancer = studyM >= 60;       // 日衡者：60学分=60分钟
+  const deepCultivator = workM >= 180;    // 深耕师：180工分=180分钟
+  const duskFerry = sportM >= 10;         // 暮渡人：10健康分=10分钟
+  const nightLaw = studyM >= 60;          // 夜律者：60学分=60分钟
   const quasiMaster = morningOrder && dayBalancer && deepCultivator && duskFerry && nightLaw;
   const nightWatch = (sleepH * 60 + sleepM) <= 22*60+30;  // 守夜人
   const dayMaster = quasiMaster && nightWatch;  // 一日之主
