@@ -5612,7 +5612,7 @@ function getLastSegEnd() {
   var maxEnd = 0;
   if (schedule && schedule.segments) {
     schedule.segments.forEach(function(s) {
-      if (s.endMin > maxEnd) maxEnd = s.endMin;
+      if (s.type !== 'unknown' && s.endMin > maxEnd) maxEnd = s.endMin;
     });
   }
   if (maxEnd >= 1440) maxEnd = 1430;
