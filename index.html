@@ -5224,21 +5224,22 @@ function generateFromSleep(date) {
   var raw = localStorage.getItem('codex_sleep_log_v1');
   if (!raw) return [];
   try { var logs = JSON.parse(raw); } catch(e) { return []; }
-  // 睡眠记录的 date 是入睡日期
-  var log = logs.find(function(l) { return l.date === date; });
-  if (!log) return [];
-  var sleepH = log.sleepH != null ? log.sleepH : (log.sleepTime ? new Date(log.sleepTime).getHours() : 23);
-  var sleepM = log.sleepM != null ? log.sleepM : (log.sleepTime ? new Date(log.sleepTime).getMinutes() : 0);
-  var startMin = sleepH * 60 + sleepM;
-  var dur = log.durationMin || 480;
-  var endMin = startMin + dur;
-  // 如果跨天，endMin > 1440 时截断到 1440
-  if (endMin > 1440) endMin = 1440;
-  return [{
-    id: 'sleep_' + date,
-    startMin: startMin, endMin: endMin,
-    type: 'sleep', label: '', source: 'sleep_log'
-  }];
+  // 使用 getSleepMinutesForDate 正确拆分跨天睡眠
+  var parts = getSleepMinutesForDate(logs, date);
+  var segs = [];
+  parts.forEach(function(p, i) {
+    var startMin = p.sleepH * 60 + p.sleepM;
+    var endMin = p.wakeH * 60 + (p.wakeM || 0);
+    // 如果起止相同（如跨天 before 段 wakeH=0,wakeM=0 表示24:00），endMin=1440
+    if (endMin === 0 && p.isCrossDay && p.crossPart === 'before') endMin = 1440;
+    if (endMin <= startMin && !(p.isCrossDay && p.crossPart === 'before')) return;
+    segs.push({
+      id: 'sleep_' + date + '_' + i,
+      startMin: startMin, endMin: endMin,
+      type: 'sleep', label: '', source: 'sleep_log'
+    });
+  });
+  return segs;
 }
 
 function fillGaps(sortedSegs) {
