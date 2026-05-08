@@ -1861,7 +1861,7 @@
     <div class="rule-box">
       <b>👑 双线全胜</b><br>
       ◦ <span class="hl">一日之主</span>：准一日之主 + 守夜人<br>
-      ◦ 效果：当日积分金币 <span class="hl">×1.1倍</span>（双线胜利）
+      ◦ 效果：当日（金币＋积分＋基础分）<span class="hl">×1.1倍</span>（双线胜利）
     </div>
   </div>
 
@@ -2668,7 +2668,7 @@ function renderDailyTitles(studyM, workM, sportM, sleepH, sleepM) {
     { key: 'nightLaw',       icon: '🌃', name: '夜律者',   desc: '22:20前60学分',  earned: titles.nightLaw },
     { key: 'quasiMaster',    icon: '⚔️', name: '准一日之主', desc: '集齐以上五星',   earned: titles.quasiMaster },
     { key: 'nightWatch',     icon: '🌙', name: '守夜人',   desc: '22:30前入睡',    earned: titles.nightWatch },
-    { key: 'dayMaster',      icon: '👑', name: '一日之主', desc: '双线全胜×1.1',   earned: titles.dayMaster },
+    { key: 'dayMaster',      icon: '👑', name: '一日之主', desc: '全胜×1.1',       earned: titles.dayMaster },
   ];
 
   // 只要有一定输入就显示预览
@@ -2714,7 +2714,7 @@ function saveCheckin() {
   // 计算每日称号
   const titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
 
-  // 一日之主加成：积分和金币 ×1.1
+  // 一日之主加成：当日（金币＋积分＋基础分）×1.1
   let totalScore = sc.total;
   if (titles.dayMaster) {
     coinEarned = Math.floor(coinEarned * 1.1);
@@ -2751,7 +2751,7 @@ function saveCheckin() {
 
   // 称号获得提示
   let titleMsg = '';
-  if (titles.dayMaster) titleMsg = '👑 一日之主！双线全胜！×1.1加成！';
+  if (titles.dayMaster) titleMsg = '👑 一日之主！双线全胜！（金币+积分+基础分）×1.1！';
   else if (titles.quasiMaster) titleMsg = '⚔️ 准一日之主！五星集齐！';
   else if (titles.nightWatch) titleMsg = '🌙 守夜人！22:30前入睡！';
   const baseMsg = `🎉 打卡成功！获得 ${coinEarned} 金币，${totalScore} 积分`;
@@ -4908,7 +4908,7 @@ function updateManualCheckinPreview() {
   var totalScore = sc.total;
   if (titles.dayMaster) { coins = Math.floor(coins * 1.1); totalScore = Math.floor(sc.total * 1.1); }
   var titleStr = '';
-  if (titles.dayMaster) titleStr = ' | 👑一日之主×1.1';
+  if (titles.dayMaster) titleStr = ' | 👑一日之主(全项×1.1)';
   else if (titles.quasiMaster) titleStr = ' | ⚔️准一日之主';
   else if (titles.nightWatch) titleStr = ' | 🌙守夜人';
   var preview = document.getElementById('manualCheckinPreview');
