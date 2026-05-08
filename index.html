@@ -1391,7 +1391,7 @@
       <select id="sleepMinute"></select>
     </div>
     <div style="margin-top:10px; font-size:12px; color:var(--muted);">
-      22:30前 <span style="color:var(--gold)">+10金币</span>  ·  23:00前 <span style="color:var(--gold)">+8金币</span>  ·  23:30前 <span style="color:var(--gold)">+6金币</span>
+      20:30~22:30 <span style="color:var(--gold)">+10金币</span>  ·  22:30~23:00 <span style="color:var(--gold)">+8金币</span>  ·  23:00~23:30 <span style="color:var(--gold)">+6金币</span>
     </div>
   </div>
 
@@ -1891,10 +1891,10 @@
     <div class="section-title">第四章：金币与奖励</div>
     <div class="rule-box">
       <b>🌙 睡眠金币（每日结算）</b><br>
-      22:30前入睡 = <span class="hl">+10金币</span><br>
-      23:00前入睡 = <span class="hl">+8金币</span><br>
-      23:30前入睡 = <span class="hl">+6金币</span><br>
-      晚于23:30 = +0金币
+      20:30~22:30入睡 = <span class="hl">+10金币</span><br>
+      22:30~23:00入睡 = <span class="hl">+8金币</span><br>
+      23:00~23:30入睡 = <span class="hl">+6金币</span><br>
+      早于20:30或晚于23:30 = +0金币
     </div>
     <div class="rule-box">
       <b>🏅 连续成就奖励（两类）</b><br>
@@ -2501,10 +2501,11 @@ function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
 
 function calcSleepCoins(h, m) {
   const t = h * 60 + m;
+  if (t < 20*60+30) return 0;      // 早于20:30无奖励
   if (t <= 22*60+30) return 10;
   if (t <= 23*60) return 8;
   if (t <= 23*60+30) return 6;
-  return 0;
+  return 0;                         // 晚于23:30无奖励
 }
 
 // ========== 每日称号计算 ==========
@@ -3056,10 +3057,10 @@ function renderStats() {
   } else {
     const sleepLabel = (() => {
       const t = rec.sleepH * 60 + rec.sleepM;
-      if (t <= 22*60+30) return '<span class="badge badge-gold">22:30前 +10金币</span>';
-      if (t <= 23*60)    return '<span class="badge badge-blue">23:00前 +8金币</span>';
-      if (t <= 23*60+30) return '<span class="badge badge-purple">23:30前 +6金币</span>';
-      return '<span class="badge badge-red">晚于23:30 +0</span>';
+      if (t <= 22*60+30) return '<span class="badge badge-gold">20:30~22:30 +10金币</span>';
+      if (t <= 23*60)    return '<span class="badge badge-blue">22:30~23:00 +8金币</span>';
+      if (t <= 23*60+30) return '<span class="badge badge-purple">23:00~23:30 +6金币</span>';
+      return '<span class="badge badge-red">无金币</span>';
     })();
 
     statsCards = `
