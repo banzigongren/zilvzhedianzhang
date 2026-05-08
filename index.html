@@ -1506,7 +1506,7 @@
     </div>
     <div class="divider"></div>
     <div style="display:flex; justify-content:space-between; align-items:center;">
-      <span style="color:var(--muted); font-size:13px;">今日总积分</span>
+      <span style="color:var(--muted); font-size:13px;">今日积分</span>
       <span class="score-val total" id="prev-total">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
@@ -2389,7 +2389,8 @@ function loadData() {
   return {
     records: [],       // 每日记录
     coins: 0,          // 金币
-    points: 0,         // 总积分（累计）
+    points: 0,         // 积分（学分+工分+健康分，不含基础分）
+    basePoints: 0,     // 累计基础分
     coupons: 0,        // 补打卡券
     spends: [],        // 消费记录
     repairedDays: [],  // 已补签的日期
@@ -2410,6 +2411,23 @@ function saveData(d) {
 }
 
 let G = loadData();
+
+// 数据迁移：旧版 G.points 包含基础分，需要拆分出 G.basePoints
+if (!G.basePoints && G.basePoints !== 0) {
+  var _migrateBase = 0;
+  for (var _i = 0; _i < G.records.length; _i++) {
+    _migrateBase += (G.records[_i].base || 0);
+    // 旧记录 total 含基础分，修正为不含基础分
+    if (G.records[_i].base && G.records[_i].total) {
+      G.records[_i].total -= G.records[_i].base;
+      if (G.records[_i].total < 0) G.records[_i].total = 0;
+    }
+  }
+  G.basePoints = _migrateBase;
+  G.points -= _migrateBase; // 从 points 中减去基础分部分
+  if (G.points < 0) G.points = 0; // 安全保护
+  saveData(G);
+}
 
 // ========== 日期工具 ==========
 function today() {
@@ -2465,7 +2483,7 @@ function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
   const sportScore = sportM;
   const sportBonus = sportM > 5 ? (sportM - 5) : 0;
 
-  const total = base + studyScore + workScore + sportScore;
+  const total = studyScore + workScore + sportScore; // 积分=学分+工分+健康分（不含基础分）
   return { base, studyScore, studyBonus, workScore, workBonus, sportScore, sportBonus, total };
 }
 
@@ -2608,7 +2626,7 @@ function updatePreview() {
   document.getElementById('prev-coin').textContent   = coins + ' 金币';
 
   // CNY 等值
-  const cny = (sc.total * 0.2 + coins).toFixed(2);
+  const cny = (sc.total * 0.2 + sc.base * 0.1 + coins).toFixed(2);
   document.getElementById('prev-cny').textContent = `¥${cny}`;
 
   // 进度条
@@ -2718,7 +2736,7 @@ function saveCheckin() {
   let totalScore = sc.total;
   if (titles.dayMaster) {
     coinEarned = Math.floor(coinEarned * 1.1);
-    totalScore = Math.floor(sc.total * 1.1);
+    totalScore = Math.floor(sc.total * 1.1) + Math.floor(sc.base * 0.1);
   }
 
   const record = {
@@ -2735,6 +2753,7 @@ function saveCheckin() {
   G.records.push(record);
   G.coins  += coinEarned;
   G.points += totalScore;
+  G.basePoints += sc.base;
 
   // 累计附加分池（用于兑换补打卡券）
   G.studyBonusPool += sc.studyBonus;
@@ -2933,7 +2952,7 @@ function spendMoney() {
   // 汇率：1金币=1元，5积分=1元，10基础分=1元
   var needCny = cny;
   var realPoints = getRealPoints();
-  var baseTotal = G.points - realPoints;        // 历史基础分总和
+  var baseTotal = G.basePoints || 0;              // 累计基础分
   var coinsCny = G.coins * 1;                   // 金币可覆盖的元数
   var pointsCny = realPoints * 0.2;             // 积分可覆盖的元数
   var baseCny = baseTotal * 0.1;                // 基础分可覆盖的元数
@@ -2984,9 +3003,10 @@ function spendMoney() {
   }
 
   G.coins -= coinsUsed;
-  // 积分和基础分都存在 G.points 里，一起扣除
-  if (pointsUsed > 0 || baseUsed > 0) {
-    G.points -= (pointsUsed + baseUsed);
+  if (pointsUsed > 0) G.points -= pointsUsed;
+  if (baseUsed > 0) {
+    if (!G.basePoints) G.basePoints = 0;
+    G.basePoints -= baseUsed;
   }
 
   var parts = [];
@@ -3056,7 +3076,7 @@ function renderStats() {
       </div>
       <div class="divider"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:var(--muted);font-size:13px;">今日总积分</span>
+        <span style="color:var(--muted);font-size:13px;">今日积分</span>
         <span class="score-val total">${rec.total}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
@@ -3069,7 +3089,7 @@ function renderStats() {
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
         <span style="color:var(--muted);font-size:13px;">等值人民币</span>
-        <span style="color:#ccc;font-weight:600;">¥${(rec.total * 0.2 + rec.coinEarned).toFixed(2)}</span>
+        <span style="color:#ccc;font-weight:600;">¥${(rec.total * 0.2 + rec.base * 0.1 + rec.coinEarned).toFixed(2)}</span>
       </div>
     </div>
 
@@ -3186,18 +3206,14 @@ function renderTimeBar(label, val, max, color) {
 
 // ===== 积分计算（积分=学分+工分+健康分，不含基础分）=====
 function getRealPoints() {
-  // G.points 包含基础分，真实积分 = G.points - 历史基础分总和
-  var baseTotal = 0;
-  for (var i = 0; i < G.records.length; i++) {
-    baseTotal += (G.records[i].base || 0);
-  }
-  return G.points - baseTotal;
+  // G.points 已不含基础分（积分=学分+工分+健康分）
+  return G.points;
 }
 
 // ===== 钱包 =====
 function renderWallet() {
   var realPoints = getRealPoints();             // 积分（学+工+健康，不含基础分）
-  var baseTotal = G.points - realPoints;        // 历史基础分总和
+  var baseTotal = G.basePoints || 0;            // 累计基础分
   var coinsCny = G.coins * 1;                  // 1金币 = 1元
   var pointsCny = realPoints * 0.2;            // 1积分 = 0.2元
   var baseCny = baseTotal * 0.1;               // 1基础分 = 0.1元
@@ -3514,7 +3530,7 @@ function renderHistory() {
           ${sleepTag}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="history-total">总积分 ${r.total}</span>
+          <span class="history-total">积分 ${r.total}</span>
           <span style="color:var(--gold);font-size:13px;">+${r.coinEarned}金币</span>
         </div>
       </div>`;
@@ -4906,14 +4922,14 @@ function updateManualCheckinPreview() {
   var coins = calcSleepCoins(sleepH, sleepM);
   var titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
   var totalScore = sc.total;
-  if (titles.dayMaster) { coins = Math.floor(coins * 1.1); totalScore = Math.floor(sc.total * 1.1); }
+  if (titles.dayMaster) { coins = Math.floor(coins * 1.1); totalScore = Math.floor(sc.total * 1.1) + Math.floor(sc.base * 0.1); }
   var titleStr = '';
   if (titles.dayMaster) titleStr = ' | 👑一日之主(全项×1.1)';
   else if (titles.quasiMaster) titleStr = ' | ⚔️准一日之主';
   else if (titles.nightWatch) titleStr = ' | 🌙守夜人';
   var preview = document.getElementById('manualCheckinPreview');
   if (preview) {
-    preview.textContent = '预览：基础 ' + sc.base + ' | 学分 ' + sc.studyScore + ' | 工分 ' + sc.workScore + ' | 健康分 ' + sc.sportScore + ' | 总积分 ' + totalScore + ' | 金币 +' + coins + titleStr;
+    preview.textContent = '预览：基础 ' + sc.base + ' | 学分 ' + sc.studyScore + ' | 工分 ' + sc.workScore + ' | 健康分 ' + sc.sportScore + ' | 积分 ' + totalScore + ' | 金币 +' + coins + titleStr;
   }
 }
 
@@ -4942,7 +4958,7 @@ function saveManualCheckin() {
   var totalScore = sc.total;
   if (titles.dayMaster) {
     coinEarned = Math.floor(coinEarned * 1.1);
-    totalScore = Math.floor(sc.total * 1.1);
+    totalScore = Math.floor(sc.total * 1.1) + Math.floor(sc.base * 0.1);
   }
   if (_editingCheckinDate) {
     var idx = G.records.findIndex(function(r) { return r.date === _editingCheckinDate; });
@@ -4950,12 +4966,14 @@ function saveManualCheckin() {
     var old = G.records[idx];
     G.coins -= old.coinEarned;
     G.points -= old.total;
+    G.basePoints -= (old.base || 0);
     G.studyBonusPool -= (old.studyBonus || 0);
     G.workBonusPool  -= (old.workBonus || 0);
     G.sportBonusPool -= (old.sportBonus || 0);
     G.records[idx] = { date: date, studyM: studyM, workM: workM, sportM: sportM, phoneM: phoneM, sleepH: sleepH, sleepM: sleepM, base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus, workScore: sc.workScore, workBonus: sc.workBonus, sportScore: sc.sportScore, sportBonus: sc.sportBonus, total: totalScore, coinEarned: coinEarned, repaired: false, titles: titles };
     G.coins += coinEarned;
     G.points += totalScore;
+    G.basePoints += sc.base;
     G.studyBonusPool += sc.studyBonus;
     G.workBonusPool  += sc.workBonus;
     G.sportBonusPool += sc.sportBonus;
@@ -4968,6 +4986,7 @@ function saveManualCheckin() {
     G.records.push({ date: date, studyM: studyM, workM: workM, sportM: sportM, phoneM: phoneM, sleepH: sleepH, sleepM: sleepM, base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus, workScore: sc.workScore, workBonus: sc.workBonus, sportScore: sc.sportScore, sportBonus: sc.sportBonus, total: totalScore, coinEarned: coinEarned, repaired: false, titles: titles });
     G.coins += coinEarned;
     G.points += totalScore;
+    G.basePoints += sc.base;
     G.studyBonusPool += sc.studyBonus;
     G.workBonusPool  += sc.workBonus;
     G.sportBonusPool += sc.sportBonus;
@@ -4985,6 +5004,7 @@ function deleteCheckinRecord(date) {
   var rec = G.records[idx];
   G.coins -= rec.coinEarned;
   G.points -= rec.total;
+  G.basePoints -= (rec.base || 0);
   G.studyBonusPool -= (rec.studyBonus || 0);
   G.workBonusPool  -= (rec.workBonus || 0);
   G.sportBonusPool -= (rec.sportBonus || 0);
