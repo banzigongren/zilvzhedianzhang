@@ -227,6 +227,41 @@
     .history-scores { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .history-total { font-size: 14px; color: var(--teal); font-weight: 600; }
 
+    /* ===== CALENDAR ===== */
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .cal-nav-btn {
+      background: none; border: 1px solid var(--border); color: var(--gold);
+      border-radius: 8px; padding: 6px 12px; font-size: 14px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cal-nav-btn:active { background: rgba(245,166,35,0.15); }
+    .cal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .cal-month-label { font-size: 16px; font-weight: 600; color: var(--gold); letter-spacing: 2px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
+    .cal-header span { font-size: 11px; color: var(--muted); padding: 4px 0; }
+    .cal-day {
+      position: relative; border-radius: 8px; padding: 6px 2px; font-size: 13px;
+      color: var(--muted); opacity: 0.35; min-height: 36px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .cal-day.in-month { opacity: 1; color: #ccc; }
+    .cal-day.checked-in {
+      background: rgba(245,166,35,0.18); color: var(--gold); font-weight: 600;
+      border: 1px solid rgba(245,166,35,0.3);
+    }
+    .cal-day.repaired {
+      background: rgba(233,69,96,0.18); color: var(--accent); font-weight: 600;
+      border: 1px solid rgba(233,69,96,0.3);
+    }
+    .cal-day.today { box-shadow: inset 0 0 0 2px var(--teal); }
+    .cal-day.clickable { cursor: pointer; }
+    .cal-day.clickable:active { transform: scale(0.92); }
+    .cal-day .cal-coin { font-size: 9px; color: var(--gold); margin-top: 1px; }
+    .cal-legend { display: flex; gap: 14px; justify-content: center; margin-top: 10px; font-size: 11px; color: var(--muted); }
+    .cal-legend-item { display: flex; align-items: center; gap: 4px; }
+    .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
     /* ===== STREAK / ACHIEVEMENT ===== */
     .streak-grid {
       display: grid;
@@ -1666,6 +1701,23 @@
   <div class="page-header-bar" id="historyHeader" style="display:none;">
     <span style="font-size:15px;font-weight:600;color:var(--gold);">📜 历史记录</span>
     <button class="add-record-btn" onclick="openManualCheckinModal()">＋ 手动添加</button>
+  </div>
+  <!-- 月历 -->
+  <div class="card" id="calendarCard">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calPrev()">◀</button>
+      <span class="cal-month-label" id="calMonthLabel"></span>
+      <button class="cal-nav-btn" onclick="calNext()">▶</button>
+    </div>
+    <div class="cal-grid cal-header">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <span class="cal-legend-item"><span class="cal-dot" style="background:var(--gold);"></span>已打卡</span>
+      <span class="cal-legend-item"><span class="cal-dot" style="background:var(--accent);"></span>补签</span>
+      <span class="cal-legend-item"><span class="cal-dot" style="background:var(--muted);opacity:0.3;"></span>未打卡</span>
+    </div>
   </div>
   <div id="historyList">
     <div class="empty">
@@ -3318,12 +3370,116 @@ function renderStreak() {
   updateExchangePreview();
 }
 
-// ===== 历史 - 加入编辑/删除 -----
+// ===== 月历 =====
+var _calYear, _calMonth; // 当前显示的年月
+var CAL_START = new Date(2026, 4, 1); // 2026-05-01，月历最早日期
+
+function initCalendar() {
+  var now = new Date();
+  _calYear = now.getFullYear();
+  _calMonth = now.getMonth() + 1;
+  // 不早于2026年5月
+  if (_calYear < 2026 || (_calYear === 2026 && _calMonth < 5)) {
+    _calYear = 2026; _calMonth = 5;
+  }
+}
+
+function calPrev() {
+  if (_calYear === 2026 && _calMonth === 5) return;
+  _calMonth--;
+  if (_calMonth < 1) { _calMonth = 12; _calYear--; }
+  renderCalendar();
+}
+
+function calNext() {
+  var now = new Date();
+  if (_calYear > now.getFullYear() || (_calYear === now.getFullYear() && _calMonth > now.getMonth() + 1)) return;
+  _calMonth++;
+  if (_calMonth > 12) { _calMonth = 1; _calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  var now = new Date();
+  var todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+
+  // 标题
+  document.getElementById('calMonthLabel').textContent = _calYear + '年' + _calMonth + '月';
+
+  // 禁用按钮判断
+  var prevBtn = document.querySelector('.cal-nav-btn:first-child');
+  var nextBtn = document.querySelector('.cal-nav-btn:last-child');
+  if (prevBtn) prevBtn.disabled = (_calYear === 2026 && _calMonth === 5);
+  if (nextBtn) nextBtn.disabled = (_calYear > now.getFullYear() || (_calYear === now.getFullYear() && _calMonth >= now.getMonth() + 1));
+
+  // 构建打卡日期查找表
+  var recMap = {};
+  for (var i = 0; i < G.records.length; i++) {
+    recMap[G.records[i].date] = G.records[i];
+  }
+  var repSet = {};
+  for (var j = 0; j < G.repairedDays.length; j++) {
+    repSet[G.repairedDays[j]] = true;
+  }
+
+  // 计算月历网格
+  var firstDay = new Date(_calYear, _calMonth - 1, 1);
+  var daysInMonth = new Date(_calYear, _calMonth, 0).getDate();
+  // 周一=0, 周日=6
+  var startWeekday = (firstDay.getDay() + 6) % 7;
+
+  var html = '';
+  // 前面的空格
+  for (var s = 0; s < startWeekday; s++) {
+    html += '<div class="cal-day"></div>';
+  }
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = _calYear + '-' + String(_calMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    // 2026年5月1日之前不显示
+    if (_calYear < 2026 || (_calYear === 2026 && _calMonth < 5)) {
+      html += '<div class="cal-day">' + d + '</div>';
+      continue;
+    }
+
+    var isToday = (dateStr === todayStr);
+    var rec = recMap[dateStr];
+    var isRepaired = !!repSet[dateStr];
+    var cls = 'cal-day in-month';
+    if (rec) cls += ' checked-in clickable';
+    else if (isRepaired) cls += ' repaired clickable';
+    if (isToday) cls += ' today';
+
+    var coinInfo = '';
+    if (rec) coinInfo = '<span class="cal-coin">+' + rec.coinEarned + '</span>';
+
+    var onclick = '';
+    if (rec) onclick = ' onclick="calDayClick(\'' + dateStr + '\')"';
+    else if (isRepaired) onclick = ' onclick="calDayClick(\'' + dateStr + '\')"';
+
+    html += '<div class="' + cls + '"' + onclick + '>' + d + coinInfo + '</div>';
+  }
+
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+function calDayClick(dateStr) {
+  // 点击日期：打开日程弹窗（如有打卡记录则显示详情）
+  var rec = G.records.find(function(r) { return r.date === dateStr; });
+  if (rec) {
+    openScheduleModal(dateStr);
+  } else {
+    openScheduleModal(dateStr);
+  }
+}
+
+// ===== 历史 - 加入编辑/删除 =====
 function renderHistory() {
+  renderCalendar(); // 渲染月历
   const el = document.getElementById('historyList');
   const header = document.getElementById('historyHeader');
   if (G.records.length === 0 && G.repairedDays.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>`;
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>';
     if (header) header.style.display = 'flex';
     return;
   }
@@ -4270,6 +4426,7 @@ function renderSleepHistory() {
 
 // ========== 启动 ==========
 initTimePicker();
+initCalendar();
 displayToday();
 
 // 回填今日打卡数据到输入框
