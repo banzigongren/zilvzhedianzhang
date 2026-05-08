@@ -1506,12 +1506,16 @@
     </div>
     <div class="divider"></div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted);">
-      <span>累计积分</span>
+      <span>累计积分（学+工+健康）</span>
       <span style="color:#a29bfe;" id="wallet-points">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
       <span>积分价值</span>
       <span style="color:#a29bfe;" id="wallet-points-cny">≈ ¥0.00</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>累计基础分（不可消费）</span>
+      <span style="color:var(--muted);" id="wallet-base">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
       <span>补打卡券</span>
@@ -2887,24 +2891,57 @@ function useCoupon() {
   showToast(`✅ 已补签 ${date}`);
 }
 
-// ========== 消费 ==========
+// ========== 消费（优先扣金币，不足扣积分） ==========
 function spendMoney() {
   const desc = document.getElementById('spendDesc').value.trim();
   const cny  = parseFloat(document.getElementById('spendCny').value) || 0;
   if (!desc) { showToast('请填写消费说明'); return; }
   if (cny <= 0) { showToast('消费金额无效'); return; }
 
-  // 1元 = 1金币
-  const coinsNeeded = cny;
-  if (G.coins < coinsNeeded) { showToast(`金币不足，需要 ${coinsNeeded} 金币`); return; }
+  // 汇率：1金币=1元，5积分=1元（即1积分=0.2元）
+  var needCny = cny;
+  var realPoints = getRealPoints();
+  var coinsCny = G.coins;          // 金币可覆盖的元数
+  var pointsCny = realPoints * 0.2; // 积分可覆盖的元数
+  var totalCny = coinsCny + pointsCny;
 
-  G.coins -= coinsNeeded;
-  G.spends.push({ date: today(), desc, cny });
+  if (totalCny < needCny) {
+    showToast(`总资产不足（¥${totalCny.toFixed(2)}），需要 ¥${needCny.toFixed(2)}`);
+    return;
+  }
+
+  var coinsUsed = 0;
+  var pointsUsed = 0;
+
+  if (G.coins >= needCny) {
+    // 金币足够
+    coinsUsed = needCny;
+  } else {
+    // 金币不足，先扣完金币，剩余用积分补
+    coinsUsed = G.coins;
+    var remainCny = needCny - coinsUsed;
+    pointsUsed = Math.ceil(remainCny / 0.2); // 向上取整，确保够扣
+  }
+
+  G.coins -= coinsUsed;
+  // 扣积分需要从 G.points 中减去（G.points含基础分，减积分等效于减总分）
+  if (pointsUsed > 0) {
+    G.points -= pointsUsed;
+  }
+
+  var detail = '';
+  if (pointsUsed > 0) {
+    detail = `扣除 ${coinsUsed} 金币 + ${pointsUsed} 积分`;
+  } else {
+    detail = `扣除 ${coinsUsed} 金币`;
+  }
+
+  G.spends.push({ date: today(), desc, cny, coinsUsed, pointsUsed });
   document.getElementById('spendDesc').value = '';
   document.getElementById('spendCny').value  = '';
   saveData(G);
   renderAll();
-  showToast(`💸 消费 ¥${cny.toFixed(2)} 扣除 ${coinsNeeded} 金币`);
+  showToast(`💸 消费 ¥${cny.toFixed(2)}，${detail}`);
 }
 
 // ========== 渲染全部 ==========
@@ -3086,16 +3123,29 @@ function renderTimeBar(label, val, max, color) {
   `;
 }
 
+// ===== 积分计算（积分=学分+工分+健康分，不含基础分）=====
+function getRealPoints() {
+  // G.points 包含基础分，真实积分 = G.points - 历史基础分总和
+  var baseTotal = 0;
+  for (var i = 0; i < G.records.length; i++) {
+    baseTotal += (G.records[i].base || 0);
+  }
+  return G.points - baseTotal;
+}
+
 // ===== 钱包 =====
 function renderWallet() {
-  var coinsCny = G.coins * 1;              // 1金币 = 1元
-  var pointsCny = G.points * 0.2;          // 1积分 = 0.2元
-  var totalCny = coinsCny + pointsCny;     // 总资产
+  var realPoints = getRealPoints();             // 积分（学+工+健康，不含基础分）
+  var baseTotal = G.points - realPoints;        // 历史基础分总和
+  var coinsCny = G.coins * 1;                  // 1金币 = 1元
+  var pointsCny = realPoints * 0.2;            // 1积分 = 0.2元
+  var totalCny = coinsCny + pointsCny;         // 总资产
 
   document.getElementById('wallet-coins').textContent = G.coins.toFixed(0);
   document.getElementById('wallet-cny').textContent   = '≈ ¥' + coinsCny.toFixed(2);
-  document.getElementById('wallet-points').textContent = G.points;
+  document.getElementById('wallet-points').textContent = realPoints;
   document.getElementById('wallet-points-cny').textContent = '≈ ¥' + pointsCny.toFixed(2);
+  document.getElementById('wallet-base').textContent = baseTotal + ' 分（≈ ¥' + (baseTotal * 0.1).toFixed(2) + '）';
   document.getElementById('wallet-coupons').textContent = G.coupons + ' 张';
   document.getElementById('wallet-total-cny').textContent = '≈ ¥' + totalCny.toFixed(2);
 
@@ -3104,15 +3154,25 @@ function renderWallet() {
     el.innerHTML = '<div class="empty" style="padding:20px;">暂无消费记录</div>';
     return;
   }
-  el.innerHTML = [...G.spends].reverse().map(s => `
+  el.innerHTML = [...G.spends].reverse().map(s => {
+    var sub = '';
+    if (s.coinsUsed || s.pointsUsed) {
+      var parts = [];
+      if (s.coinsUsed) parts.push(s.coinsUsed + '金币');
+      if (s.pointsUsed) parts.push(s.pointsUsed + '积分');
+      sub = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + parts.join(' + ') + '</div>';
+    }
+    return `
     <div class="history-item">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:14px;">${s.desc}</span>
         <span style="color:var(--accent);font-weight:700;">-¥${s.cny.toFixed(2)}</span>
       </div>
+      ${sub}
       <div class="history-date">${s.date}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ===== 成就 =====
