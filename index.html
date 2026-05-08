@@ -2487,13 +2487,13 @@ function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
   const base = baseScore;
 
   const studyScore = studyM;
-  const studyBonus = studyM > 240 ? (studyM - 240) : 0;
+  const studyBonus = studyM > 120 ? (studyM - 120) : 0;
 
   const workScore = workM;
-  const workBonus = workM > 720 ? (workM - 720) : 0;
+  const workBonus = workM > 360 ? (workM - 360) : 0;
 
   const sportScore = sportM;
-  const sportBonus = sportM > 10 ? (sportM - 10) : 0;
+  const sportBonus = sportM > 5 ? (sportM - 5) : 0;
 
   const total = base + studyScore + workScore + sportScore;
   return { base, studyScore, studyBonus, workScore, workBonus, sportScore, sportBonus, total };
