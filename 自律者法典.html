@@ -227,6 +227,50 @@
     .history-scores { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .history-total { font-size: 14px; color: var(--teal); font-weight: 600; }
 
+    /* ===== CALENDAR ===== */
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .cal-nav-btn {
+      background: none; border: 1px solid var(--border); color: var(--gold);
+      border-radius: 8px; padding: 6px 12px; font-size: 14px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cal-nav-btn:active { background: rgba(245,166,35,0.15); }
+    .cal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .cal-month-label { font-size: 16px; font-weight: 600; color: var(--gold); letter-spacing: 2px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
+    .cal-header span { font-size: 11px; color: var(--muted); padding: 4px 0; }
+    .cal-day {
+      position: relative; border-radius: 8px; padding: 6px 2px; font-size: 13px;
+      color: var(--muted); opacity: 0.35; min-height: 36px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .cal-day.in-month { opacity: 1; color: #ccc; }
+    .cal-day.checked-in {
+      background: rgba(245,166,35,0.18); color: var(--gold); font-weight: 600;
+      border: 1px solid rgba(245,166,35,0.3);
+    }
+    .cal-day.repaired {
+      background: rgba(233,69,96,0.18); color: var(--accent); font-weight: 600;
+      border: 1px solid rgba(233,69,96,0.3);
+    }
+    .cal-day.today { box-shadow: inset 0 0 0 2px var(--teal); }
+    .cal-day.clickable { cursor: pointer; }
+    .cal-day.clickable:active { transform: scale(0.92); }
+    .cal-day .cal-coin { font-size: 9px; color: var(--gold); margin-top: 1px; }
+    .cal-mini-bar {
+      display: block; position: relative; width: 100%; height: 4px;
+      background: rgba(255,255,255,0.05); border-radius: 2px;
+      margin-top: 3px; overflow: hidden;
+    }
+    .cal-mini-seg {
+      position: absolute; top: 0; height: 100%; border-radius: 1px;
+      min-width: 1px;
+    }
+    .cal-legend { display: flex; gap: 14px; justify-content: center; margin-top: 10px; font-size: 11px; color: var(--muted); }
+    .cal-legend-item { display: flex; align-items: center; gap: 4px; }
+    .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
     /* ===== STREAK / ACHIEVEMENT ===== */
     .streak-grid {
       display: grid;
@@ -1506,12 +1550,25 @@
     </div>
     <div class="divider"></div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted);">
-      <span>累计积分</span>
+      <span>累计积分（学+工+健康）</span>
       <span style="color:#a29bfe;" id="wallet-points">0</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>积分价值</span>
+      <span style="color:#a29bfe;" id="wallet-points-cny">≈ ¥0.00</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>累计基础分</span>
+      <span style="color:var(--muted);" id="wallet-base">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
       <span>补打卡券</span>
       <span style="color:var(--teal);" id="wallet-coupons">0 张</span>
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px;">
+      <span style="color:var(--gold); font-weight:600;">💰 总资产</span>
+      <span style="color:var(--gold); font-size:20px; font-weight:700;" id="wallet-total-cny">≈ ¥0.00</span>
     </div>
   </div>
 
@@ -1541,8 +1598,8 @@
   <div class="card">
     <div class="card-title"><span class="icon">🔄</span>汇率说明</div>
     <div class="formula">
-      1 金币 = 10 基础分 = 1 元人民币<br>
-      1 积分（学/工/健康分）= 2 基础分 = 0.2 元
+      1 金币 = 5 积分 = 10 基础分 = 1 元人民币<br>
+      消费优先级：金币 → 积分 → 基础分
     </div>
   </div>
 </div>
@@ -1653,6 +1710,23 @@
   <div class="page-header-bar" id="historyHeader" style="display:none;">
     <span style="font-size:15px;font-weight:600;color:var(--gold);">📜 历史记录</span>
     <button class="add-record-btn" onclick="openManualCheckinModal()">＋ 手动添加</button>
+  </div>
+  <!-- 月历 -->
+  <div class="card" id="calendarCard">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calPrev()">◀</button>
+      <span class="cal-month-label" id="calMonthLabel"></span>
+      <button class="cal-nav-btn" onclick="calNext()">▶</button>
+    </div>
+    <div class="cal-grid cal-header">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <span class="cal-legend-item"><span class="cal-dot" style="background:var(--gold);"></span>已打卡</span>
+      <span class="cal-legend-item"><span class="cal-dot" style="background:var(--accent);"></span>补签</span>
+      <span class="cal-legend-item"><span class="cal-dot" style="background:var(--muted);opacity:0.3;"></span>未打卡</span>
+    </div>
   </div>
   <div id="historyList">
     <div class="empty">
@@ -2878,24 +2952,84 @@ function useCoupon() {
   showToast(`✅ 已补签 ${date}`);
 }
 
-// ========== 消费 ==========
+// ========== 消费（优先扣金币→积分→基础分） ==========
 function spendMoney() {
   const desc = document.getElementById('spendDesc').value.trim();
   const cny  = parseFloat(document.getElementById('spendCny').value) || 0;
   if (!desc) { showToast('请填写消费说明'); return; }
   if (cny <= 0) { showToast('消费金额无效'); return; }
 
-  // 1元 = 1金币
-  const coinsNeeded = cny;
-  if (G.coins < coinsNeeded) { showToast(`金币不足，需要 ${coinsNeeded} 金币`); return; }
+  // 汇率：1金币=1元，5积分=1元，10基础分=1元
+  var needCny = cny;
+  var realPoints = getRealPoints();
+  var baseTotal = G.points - realPoints;        // 历史基础分总和
+  var coinsCny = G.coins * 1;                   // 金币可覆盖的元数
+  var pointsCny = realPoints * 0.2;             // 积分可覆盖的元数
+  var baseCny = baseTotal * 0.1;                // 基础分可覆盖的元数
+  var totalCny = coinsCny + pointsCny + baseCny;
 
-  G.coins -= coinsNeeded;
-  G.spends.push({ date: today(), desc, cny });
+  if (totalCny < needCny) {
+    showToast('总资产不足（¥' + totalCny.toFixed(2) + '），需要 ¥' + needCny.toFixed(2));
+    return;
+  }
+
+  var coinsUsed = 0;
+  var pointsUsed = 0;
+  var baseUsed = 0;
+  var remainCny = needCny;
+
+  // 第1级：扣金币
+  if (remainCny <= 0) { /* skip */ }
+  else if (G.coins >= remainCny) {
+    coinsUsed = remainCny;
+    remainCny = 0;
+  } else {
+    coinsUsed = G.coins;
+    remainCny -= coinsUsed;
+  }
+
+  // 第2级：扣积分（5积分=1元）
+  if (remainCny > 0 && realPoints > 0) {
+    var pointsCoversCny = realPoints * 0.2;
+    if (pointsCoversCny >= remainCny) {
+      pointsUsed = Math.ceil(remainCny / 0.2);
+      remainCny = 0;
+    } else {
+      pointsUsed = realPoints;
+      remainCny -= pointsCoversCny;
+    }
+  }
+
+  // 第3级：扣基础分（10基础分=1元）
+  if (remainCny > 0 && baseTotal > 0) {
+    var baseCoversCny = baseTotal * 0.1;
+    if (baseCoversCny >= remainCny) {
+      baseUsed = Math.ceil(remainCny / 0.1);
+      remainCny = 0;
+    } else {
+      baseUsed = baseTotal;
+      remainCny -= baseCoversCny;
+    }
+  }
+
+  G.coins -= coinsUsed;
+  // 积分和基础分都存在 G.points 里，一起扣除
+  if (pointsUsed > 0 || baseUsed > 0) {
+    G.points -= (pointsUsed + baseUsed);
+  }
+
+  var parts = [];
+  if (coinsUsed > 0) parts.push(coinsUsed + '金币');
+  if (pointsUsed > 0) parts.push(pointsUsed + '积分');
+  if (baseUsed > 0) parts.push(baseUsed + '基础分');
+  var detail = '扣除 ' + parts.join(' + ');
+
+  G.spends.push({ date: today(), desc, cny, coinsUsed, pointsUsed, baseUsed });
   document.getElementById('spendDesc').value = '';
   document.getElementById('spendCny').value  = '';
   saveData(G);
   renderAll();
-  showToast(`💸 消费 ¥${cny.toFixed(2)} 扣除 ${coinsNeeded} 金币`);
+  showToast('💸 消费 ¥' + cny.toFixed(2) + '，' + detail);
 }
 
 // ========== 渲染全部 ==========
@@ -3022,7 +3156,7 @@ function renderStats() {
       </div>
       <div class="legend-title">时段详情（点击灰色段可补充）</div>
       <div id="statsTimelineLegend"></div>
-      <button class="add-seg-btn" onclick="showAddSegForm_stats()">＋ 添加时段</button>
+      <button class="add-seg-btn" onclick="showAddSegForm_stats(getLastSegEnd())">＋ 添加时段</button>
       <div class="seg-form" id="statsSegForm" style="display:none;">
         <div class="seg-form-title" id="statsSegFormTitle">添加时段</div>
         <div class="seg-form-row">
@@ -3077,27 +3211,58 @@ function renderTimeBar(label, val, max, color) {
   `;
 }
 
+// ===== 积分计算（积分=学分+工分+健康分，不含基础分）=====
+function getRealPoints() {
+  // G.points 包含基础分，真实积分 = G.points - 历史基础分总和
+  var baseTotal = 0;
+  for (var i = 0; i < G.records.length; i++) {
+    baseTotal += (G.records[i].base || 0);
+  }
+  return G.points - baseTotal;
+}
+
 // ===== 钱包 =====
 function renderWallet() {
+  var realPoints = getRealPoints();             // 积分（学+工+健康，不含基础分）
+  var baseTotal = G.points - realPoints;        // 历史基础分总和
+  var coinsCny = G.coins * 1;                  // 1金币 = 1元
+  var pointsCny = realPoints * 0.2;            // 1积分 = 0.2元
+  var baseCny = baseTotal * 0.1;               // 1基础分 = 0.1元
+  var totalCny = coinsCny + pointsCny + baseCny; // 总资产
+
   document.getElementById('wallet-coins').textContent = G.coins.toFixed(0);
-  document.getElementById('wallet-cny').textContent   = `≈ ¥${(G.coins).toFixed(2)}`;
-  document.getElementById('wallet-points').textContent = G.points;
+  document.getElementById('wallet-cny').textContent   = '≈ ¥' + coinsCny.toFixed(2);
+  document.getElementById('wallet-points').textContent = realPoints;
+  document.getElementById('wallet-points-cny').textContent = '≈ ¥' + pointsCny.toFixed(2);
+  document.getElementById('wallet-base').textContent = baseTotal + ' 分（≈ ¥' + baseCny.toFixed(2) + '）';
   document.getElementById('wallet-coupons').textContent = G.coupons + ' 张';
+  document.getElementById('wallet-total-cny').textContent = '≈ ¥' + totalCny.toFixed(2);
 
   const el = document.getElementById('spendHistory');
   if (G.spends.length === 0) {
     el.innerHTML = '<div class="empty" style="padding:20px;">暂无消费记录</div>';
     return;
   }
-  el.innerHTML = [...G.spends].reverse().map(s => `
+  el.innerHTML = [...G.spends].reverse().map(s => {
+    var sub = '';
+    if (s.coinsUsed || s.pointsUsed || s.baseUsed) {
+      var parts = [];
+      if (s.coinsUsed) parts.push(s.coinsUsed + '金币');
+      if (s.pointsUsed) parts.push(s.pointsUsed + '积分');
+      if (s.baseUsed) parts.push(s.baseUsed + '基础分');
+      sub = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + parts.join(' + ') + '</div>';
+    }
+    return `
     <div class="history-item">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:14px;">${s.desc}</span>
         <span style="color:var(--accent);font-weight:700;">-¥${s.cny.toFixed(2)}</span>
       </div>
+      ${sub}
       <div class="history-date">${s.date}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ===== 成就 =====
@@ -3214,12 +3379,140 @@ function renderStreak() {
   updateExchangePreview();
 }
 
-// ===== 历史 - 加入编辑/删除 -----
+// ===== 月历 =====
+var _calYear, _calMonth; // 当前显示的年月
+var CAL_START = new Date(2026, 4, 1); // 2026-05-01，月历最早日期
+
+function initCalendar() {
+  var now = new Date();
+  _calYear = now.getFullYear();
+  _calMonth = now.getMonth() + 1;
+  // 不早于2026年5月
+  if (_calYear < 2026 || (_calYear === 2026 && _calMonth < 5)) {
+    _calYear = 2026; _calMonth = 5;
+  }
+}
+
+function calPrev() {
+  if (_calYear === 2026 && _calMonth === 5) return;
+  _calMonth--;
+  if (_calMonth < 1) { _calMonth = 12; _calYear--; }
+  renderCalendar();
+}
+
+function calNext() {
+  var now = new Date();
+  if (_calYear > now.getFullYear() || (_calYear === now.getFullYear() && _calMonth > now.getMonth() + 1)) return;
+  _calMonth++;
+  if (_calMonth > 12) { _calMonth = 1; _calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  var now = new Date();
+  var todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+
+  // 标题
+  document.getElementById('calMonthLabel').textContent = _calYear + '年' + _calMonth + '月';
+
+  // 禁用按钮判断
+  var prevBtn = document.querySelector('.cal-nav-btn:first-child');
+  var nextBtn = document.querySelector('.cal-nav-btn:last-child');
+  if (prevBtn) prevBtn.disabled = (_calYear === 2026 && _calMonth === 5);
+  if (nextBtn) nextBtn.disabled = (_calYear > now.getFullYear() || (_calYear === now.getFullYear() && _calMonth >= now.getMonth() + 1));
+
+  // 构建打卡日期查找表
+  var recMap = {};
+  for (var i = 0; i < G.records.length; i++) {
+    recMap[G.records[i].date] = G.records[i];
+  }
+  var repSet = {};
+  for (var j = 0; j < G.repairedDays.length; j++) {
+    repSet[G.repairedDays[j]] = true;
+  }
+
+  // 预生成每日迷你时间轴（缓存）
+  var miniTimelineCache = {};
+  for (var d = 1; d <= 31; d++) {
+    var ds = _calYear + '-' + String(_calMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    if (!(_calYear < 2026 || (_calYear === 2026 && _calMonth < 5) || d > new Date(_calYear, _calMonth, 0).getDate())) {
+      var sch = getDaySchedule(ds);
+      if (sch.segments && sch.segments.length > 0) {
+        miniTimelineCache[ds] = buildMiniTimeline(sch.segments);
+      }
+    }
+  }
+
+  // 计算月历网格
+  var firstDay = new Date(_calYear, _calMonth - 1, 1);
+  var daysInMonth = new Date(_calYear, _calMonth, 0).getDate();
+  // 周一=0, 周日=6
+  var startWeekday = (firstDay.getDay() + 6) % 7;
+
+  var html = '';
+  // 前面的空格
+  for (var s = 0; s < startWeekday; s++) {
+    html += '<div class="cal-day"></div>';
+  }
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = _calYear + '-' + String(_calMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    // 2026年5月1日之前不显示迷你条
+    if (_calYear < 2026 || (_calYear === 2026 && _calMonth < 5)) {
+      html += '<div class="cal-day">' + d + '</div>';
+      continue;
+    }
+
+    var isToday = (dateStr === todayStr);
+    var rec = recMap[dateStr];
+    var isRepaired = !!repSet[dateStr];
+    var cls = 'cal-day in-month clickable';
+    if (rec) cls += ' checked-in';
+    else if (isRepaired) cls += ' repaired';
+    if (isToday) cls += ' today';
+
+    var coinInfo = '';
+    if (rec) coinInfo = '<span class="cal-coin">+' + rec.coinEarned + '</span>';
+
+    // 迷你时间轴
+    var miniBar = miniTimelineCache[dateStr] || '';
+
+    html += '<div class="' + cls + '" onclick="calDayClick(\'' + dateStr + '\')">' + d + coinInfo + miniBar + '</div>';
+  }
+
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+// 构建迷你时间轴色条HTML
+function buildMiniTimeline(segments) {
+  if (!segments || segments.length === 0) return '';
+  var bars = '';
+  for (var i = 0; i < segments.length; i++) {
+    var seg = segments[i];
+    if (seg.type === 'unknown') continue; // 跳过"待补充"段
+    var cfg = SCHEDULE_TYPE_CFG[seg.type];
+    if (!cfg) continue;
+    var left = (seg.startMin / 1440) * 100;
+    var width = ((seg.endMin - seg.startMin) / 1440) * 100;
+    if (width < 1) continue; // 太窄不显示
+    bars += '<span class="cal-mini-seg" style="left:' + left + '%;width:' + width + '%;background:' + cfg.color + ';"></span>';
+  }
+  if (!bars) return '';
+  return '<span class="cal-mini-bar">' + bars + '</span>';
+}
+
+function calDayClick(dateStr) {
+  // 点击日期：打开日程弹窗，查看当日日程时间轴
+  openScheduleModal(dateStr);
+}
+
+// ===== 历史 - 加入编辑/删除 =====
 function renderHistory() {
+  renderCalendar(); // 渲染月历
   const el = document.getElementById('historyList');
   const header = document.getElementById('historyHeader');
   if (G.records.length === 0 && G.repairedDays.length === 0) {
-    el.innerHTML = `<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>`;
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>';
     if (header) header.style.display = 'flex';
     return;
   }
@@ -4166,6 +4459,7 @@ function renderSleepHistory() {
 
 // ========== 启动 ==========
 initTimePicker();
+initCalendar();
 displayToday();
 
 // 回填今日打卡数据到输入框
@@ -4439,7 +4733,6 @@ function applyAllData(data) {
 }
 
 async function pushToCloud(btn) {
-  // === 入口确认（最先执行，任何错误都能看到） ===
   var s = document.getElementById('syncStatus');
   var origText = btn ? btn.textContent : '';
   try {
@@ -4448,13 +4741,15 @@ async function pushToCloud(btn) {
   } catch(e2) {}
 
   try {
-    console.log('[sync] pushToCloud called');
-    var token = localStorage.getItem(SYNC_TOKEN_KEY);
-    var gistId = localStorage.getItem(SYNC_GIST_KEY);
-    console.log('[sync] token exists:', !!token, 'gistId exists:', !!gistId);
+    // 优先从输入框取值，同时自动保存配置
+    var tokenEl = document.getElementById('syncToken');
+    var gistEl = document.getElementById('syncGistId');
+    var token = (tokenEl ? tokenEl.value.trim() : '') || localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = (gistEl ? gistEl.value.trim() : '') || localStorage.getItem(SYNC_GIST_KEY);
+    if (token && tokenEl) { localStorage.setItem(SYNC_TOKEN_KEY, token); }
+    if (gistId && gistEl) { localStorage.setItem(SYNC_GIST_KEY, gistId); }
     if (!token) {
-      showToast('请先配置同步 Token');
-      openSyncModal();
+      showToast('请先输入 GitHub Token');
       if (btn) { btn.disabled = false; btn.textContent = '☁️ 上传到云'; }
       return;
     }
@@ -4518,12 +4813,15 @@ async function pullFromCloud(btn) {
   } catch(e2) {}
 
   try {
-    console.log('[sync] pullFromCloud called');
-    var token = localStorage.getItem(SYNC_TOKEN_KEY);
-    var gistId = localStorage.getItem(SYNC_GIST_KEY);
+    // 优先从输入框取值，同时自动保存配置
+    var tokenEl = document.getElementById('syncToken');
+    var gistEl = document.getElementById('syncGistId');
+    var token = (tokenEl ? tokenEl.value.trim() : '') || localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = (gistEl ? gistEl.value.trim() : '') || localStorage.getItem(SYNC_GIST_KEY);
+    if (token && tokenEl) { localStorage.setItem(SYNC_TOKEN_KEY, token); }
+    if (gistId && gistEl) { localStorage.setItem(SYNC_GIST_KEY, gistId); }
     if (!token || !gistId) {
-      showToast('请先完成同步设置');
-      openSyncModal();
+      showToast('请先输入 Token 和 Gist ID');
       if (btn) { btn.disabled = false; btn.textContent = '📥 从云下载'; }
       return;
     }
@@ -5268,6 +5566,18 @@ function handleLegendClick_stats(id, type, startMin, endMin, label, note) {
   }
 }
 
+function getLastSegEnd() {
+  var schedule = getDaySchedule(today());
+  var maxEnd = 0;
+  if (schedule && schedule.segments) {
+    schedule.segments.forEach(function(s) {
+      if (s.endMin > maxEnd) maxEnd = s.endMin;
+    });
+  }
+  if (maxEnd >= 1440) maxEnd = 1430;
+  return maxEnd;
+}
+
 function showAddSegForm_stats(startMin, endMin) {
   _editingSegId = null;
   _scheduleDate = today();
@@ -5275,7 +5585,9 @@ function showAddSegForm_stats(startMin, endMin) {
   document.getElementById('statsSegForm').style.display = 'block';
   document.getElementById('statsDelSegBtn').style.display = 'none';
   initTypeChipsIn('daily', 'statsSegTypeChips');
-  initTimeSelectsIn(startMin || 0, endMin || 60, 'statsSegStartH', 'statsSegStartM', 'statsSegEndH', 'statsSegEndM');
+  var s = startMin || 0;
+  var e = endMin || Math.min(s + 60, 1440);
+  initTimeSelectsIn(s, e, 'statsSegStartH', 'statsSegStartM', 'statsSegEndH', 'statsSegEndM');
   document.getElementById('statsSegLabel').value = '';
   document.getElementById('statsSegNote').value = '';
 }
