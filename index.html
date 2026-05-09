@@ -1507,9 +1507,13 @@
       </div>
     </div>
 
-    <button class="btn btn-primary" onclick="saveCheckin()">📋 保存</button>
-    <button class="btn btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#f5a623,#e94560);" onclick="settleDate(today())">💰 结算今日</button>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">保存=仅存日程；结算=资产计入钱包（结算后不可改）</div>
+    <div id="checkinBtnArea">
+      <button class="btn btn-primary" id="checkinSaveBtn" onclick="saveCheckin(false)">📋 保存</button>
+      <button class="btn btn-primary" id="checkinCheckinBtn" style="margin-top:8px;display:none;background:linear-gradient(135deg,#4caf50,#1abc9c);" onclick="saveCheckin(true)">✅ 打卡</button>
+      <button class="btn btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#f5a623,#e94560);" onclick="settleDate(today())">💰 结算今日</button>
+    </div>
+    <div id="checkinConditionHint" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px;text-align:center;">保存=仅存数据；打卡=满足条件标记完成；结算=资产计入钱包</div>
     <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(26,188,156,0.15);color:var(--teal);" onclick="syncFromSchedule()">📅 从日程同步</button>
     <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(255,255,255,0.05);color:var(--muted);" onclick="openManualCheckinModal()">📝 补记/编辑其他日期</button>
   </div>
@@ -1518,7 +1522,7 @@
   <div id="statsContent">
     <div class="empty">
       <div class="empty-icon">📊</div>
-      今日尚未打卡，请先完成打卡
+      今日尚未保存数据，请填写并保存
     </div>
   </div>
 </div>
@@ -1954,6 +1958,20 @@
       5 学分 = 5 工分 = 5 健康分 = 10 基础分 = 1 元人民币<br>
       消费范围：品质生活内容（旅游、数码、餐饮、课程等）<br>
       <span class="hl">消费优先级：</span>金币 → 学分 → 工分 → 健康分 → 基础分（逐级扣减）
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">第八章：打卡规则</div>
+    <div class="rule-box">
+      <b>🎯 打卡条件</b><br>
+      学分与工分合计满 <span class="hl">480 分</span> 且 健康分满 <span class="hl">5 分</span> 才能打卡<br>
+      未满足打卡条件时，只能<span class="hl">保存</span>当日数据，不能标记为打卡<br>
+      打卡成功后弹出格言警句
+    </div>
+    <div class="rule-box">
+      <b>📋 三步流程</b><br>
+      ① 填写/同步今日数据 → ② 打卡（满足条件）或保存 → ③ 结算（资产计入钱包）
     </div>
   </div>
 
@@ -2744,6 +2762,8 @@ function updatePreview() {
   updateExchangePreview();
   // 更新每日称号预览
   renderDailyTitles(studyM, workM, sportM, sleepH, sleepM);
+  // 更新打卡按钮状态
+  updateCheckinBtn();
 }
 
 // ========== 兑换预览 ==========
@@ -2807,8 +2827,51 @@ function renderDailyTitles(studyM, workM, sportM, sleepH, sleepM) {
   }).join('');
 }
 
-// ========== 保存打卡 ==========
-function saveCheckin() {
+// ========== 检查打卡条件 ==========
+function checkCheckinCondition() {
+  var studyM = parseInt(document.getElementById('studyMin').value) || 0;
+  var workM  = parseInt(document.getElementById('workMin').value) || 0;
+  var sportM = parseInt(document.getElementById('sportMin').value) || 0;
+  var wasteM = parseInt(document.getElementById('phoneMin').value) || 0;
+  var funM   = parseInt(document.getElementById('funMin').value) || 0;
+  var dailyM = parseInt(document.getElementById('dailyMin').value) || 0;
+  var sc = calcScores(studyM, workM, sportM, wasteM, funM, dailyM);
+  var studyWorkTotal = (sc.studyScore + sc.studyBonus) + (sc.workScore + sc.workBonus);
+  var sportTotal = sc.sportScore + sc.sportBonus;
+  return { canCheckin: studyWorkTotal >= 480 && sportTotal >= 5, studyWorkTotal: studyWorkTotal, sportTotal: sportTotal };
+}
+
+function updateCheckinBtn() {
+  var ck = checkCheckinCondition();
+  var saveBtn = document.getElementById('checkinSaveBtn');
+  var checkinBtn = document.getElementById('checkinCheckinBtn');
+  var hint = document.getElementById('checkinConditionHint');
+  if (!saveBtn || !checkinBtn) return;
+  // 已结算时隐藏两个按钮
+  var date = today();
+  var rec = G.records.find(function(r) { return r.date === date; });
+  if (rec && rec.settled) {
+    saveBtn.style.display = 'none';
+    checkinBtn.style.display = 'none';
+    if (hint) hint.textContent = '✅ 今日已结算';
+    return;
+  }
+  if (ck.canCheckin) {
+    saveBtn.style.display = 'none';
+    checkinBtn.style.display = 'block';
+    if (hint) hint.innerHTML = '<span style="color:#4caf50;">✅ 学工合计' + ck.studyWorkTotal + '分 ≥ 480，健康' + ck.sportTotal + '分 ≥ 5，满足打卡条件</span>';
+  } else {
+    saveBtn.style.display = 'block';
+    checkinBtn.style.display = 'none';
+    var lack = [];
+    if (ck.studyWorkTotal < 480) lack.push('学工合计差' + (480 - ck.studyWorkTotal) + '分');
+    if (ck.sportTotal < 5) lack.push('健康差' + (5 - ck.sportTotal) + '分');
+    if (hint) hint.innerHTML = '<span style="color:#e94560;">🔒 ' + lack.join('，') + '，未满足打卡条件，只能保存</span>';
+  }
+}
+
+// ========== 保存/打卡 ==========
+function saveCheckin(isCheckin) {
   const studyM = parseInt(document.getElementById('studyMin').value) || 0;
   const workM  = parseInt(document.getElementById('workMin').value) || 0;
   const sportM = parseInt(document.getElementById('sportMin').value) || 0;
@@ -2818,6 +2881,15 @@ function saveCheckin() {
   const st = getTodaySleepTime();
   const sleepH = st.h;
   const sleepM = st.m;
+
+  // 打卡时验证条件
+  if (isCheckin) {
+    var ck = checkCheckinCondition();
+    if (!ck.canCheckin) {
+      showToast('❌ 未满足打卡条件：学工合计需≥480分且健康分需≥5分');
+      return;
+    }
+  }
 
   const date = today();
   const existed = G.records.find(r => r.date === date);
@@ -2840,10 +2912,17 @@ function saveCheckin() {
     }
     Object.assign(existed, {
       studyM, workM, sportM, wasteM, funM, dailyM, sleepH, sleepM,
-      ...sc, earnedStudy, earnedWork, earnedSport, earnedBase, coinEarned, titles
+      ...sc, earnedStudy, earnedWork, earnedSport, earnedBase, coinEarned, titles,
+      checkedIn: isCheckin ? true : (existed.checkedIn || false)
     });
+    var wasAlreadyCheckedIn = existed.checkedIn && !isCheckin;
     saveData(G); renderAll();
-    showToast('📋 已保存，点击"结算"将资产计入钱包');
+    if (isCheckin) {
+      showToast('✅ 打卡成功！');
+      showQuoteModal('evening');
+    } else {
+      showToast('📋 已保存，点击"结算"将资产计入钱包');
+    }
     return;
   }
 
@@ -2875,13 +2954,19 @@ function saveCheckin() {
     coinEarned,
     repaired: false,
     titles,
-    settled: false
+    settled: false,
+    checkedIn: !!isCheckin
   };
 
   G.records.push(record);
   // 注意：不添加到 G.*，等结算后再加
   saveData(G); renderAll();
-  showToast('📋 已保存！点击"结算"将资产计入钱包');
+  if (isCheckin) {
+    showToast('✅ 打卡成功！');
+    showQuoteModal('evening');
+  } else {
+    showToast('📋 已保存！点击"结算"将资产计入钱包');
+  }
 }
 
 // ========== 结算/取消结算 ==========
@@ -3263,7 +3348,10 @@ function renderStats() {
     </div>
     ${rec.settled
       ? '<div style="text-align:center;padding:8px;color:var(--gold);font-size:13px;">✅ 已结算 — 资产已计入钱包</div>'
-      : '<div style="text-align:center;padding:8px;"><span style="color:#e94560;font-size:13px;">⏳ 未结算 — 资产尚未计入钱包</span><br><button class="btn btn-sm" style="margin-top:6px;background:linear-gradient(135deg,#f5a623,#e94560);color:#fff;" onclick="settleDate(today())">💰 结算今日</button></div>'
+      : (rec.checkedIn
+        ? '<div style="text-align:center;padding:8px;color:#4caf50;font-size:13px;">✅ 已打卡 — 满足学工≥480+健康≥5条件<span style="color:#e94560;font-size:12px;"> · 未结算</span><br><button class="btn btn-sm" style="margin-top:6px;background:linear-gradient(135deg,#f5a623,#e94560);color:#fff;" onclick="settleDate(today())">💰 结算今日</button></div>'
+        : '<div style="text-align:center;padding:8px;"><span style="color:#e94560;font-size:13px;">⏳ 未打卡 — 资产尚未计入钱包</span><br><button class="btn btn-sm" style="margin-top:6px;background:linear-gradient(135deg,#f5a623,#e94560);color:#fff;" onclick="settleDate(today())">💰 结算今日</button></div>'
+      )
     }
   `;
   }
@@ -3708,7 +3796,9 @@ function renderHistory() {
       : '<button class="history-action-btn" title="结算" onclick="settleDate(\'' + r.date + '\')" style="color:#f5a623;">💰</button>';
     var settledBadge = r.settled
       ? '<span class="badge badge-gold">已结算</span>'
-      : '<span class="badge badge-red">未结算</span>';
+      : (r.checkedIn
+        ? '<span class="badge badge-green">已打卡</span>'
+        : '<span class="badge badge-red">未打卡</span>');
     return `
       <div class="history-item">
         <div class="history-actions">
@@ -4610,6 +4700,30 @@ refreshSleepDuration();
 initTimer();
 initSleepPage();
 
+// ========== 自动归档前一日程时间轴 ==========
+function autoArchiveYesterdaySchedule() {
+  var yesterday = dayBefore(today());
+  var schedules = loadScheduleData();
+  var existing = schedules.find(function(s) { return s.date === yesterday; });
+  if (existing) return; // 已有数据，跳过
+
+  // 生成昨日的完整日程（timer + sleep + 手动段都已在getDaySchedule中合并）
+  var schedule = getDaySchedule(yesterday);
+  // 过滤掉 unknown/gap 段，只保留有实际内容的段
+  var realSegs = schedule.segments.filter(function(seg) { return seg.type !== 'unknown'; });
+  if (realSegs.length === 0) return; // 没有实际数据，不归档
+
+  // 标记归档来源
+  realSegs.forEach(function(seg) {
+    if (!seg.source || seg.source === 'auto') seg.source = 'auto_archive';
+  });
+
+  schedules.push({ date: yesterday, segments: realSegs });
+  saveScheduleData(schedules);
+  console.log('[autoArchive] 归档了 ' + yesterday + ' 的日程，共 ' + realSegs.length + ' 个时段');
+}
+autoArchiveYesterdaySchedule();
+
 // ========== 本地备份：导出 / 导入 ==========
 function exportData() {
   const d = collectAllData();
@@ -5144,13 +5258,18 @@ function saveManualCheckin() {
     var old = G.records[idx];
     if (old.settled) { showToast('该日期已结算，请先取消结算再编辑'); return; }
     // 未结算：直接更新记录，不触动 G.*
+    // 重新检查打卡条件
+    var swTotal = earnedStudy + earnedWork;
+    var spTotal = earnedSport;
+    var canCheckin = swTotal >= 480 && spTotal >= 5;
     G.records[idx] = Object.assign({}, old, {
       date, studyM, workM, sportM, phoneM, sleepH, sleepM,
       base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus,
       workScore: sc.workScore, workBonus: sc.workBonus,
       sportScore: sc.sportScore, sportBonus: sc.sportBonus,
       earnedStudy, earnedWork, earnedSport, earnedBase,
-      coinEarned, titles, repaired: false
+      coinEarned, titles, repaired: false,
+      checkedIn: canCheckin
     });
     showToast('✅ 已更新 ' + date + ' 的记录（未结算）');
   } else {
@@ -5158,12 +5277,17 @@ function saveManualCheckin() {
       showToast('该日期已有打卡记录，请使用编辑功能');
       return;
     }
+    // 检查打卡条件
+    var swTotal = earnedStudy + earnedWork;
+    var spTotal = earnedSport;
+    var canCheckin = swTotal >= 480 && spTotal >= 5;
     G.records.push({ date, studyM, workM, sportM, phoneM, sleepH, sleepM,
       base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus,
       workScore: sc.workScore, workBonus: sc.workBonus,
       sportScore: sc.sportScore, sportBonus: sc.sportBonus,
       earnedStudy, earnedWork, earnedSport, earnedBase,
-      coinEarned, repaired: false, titles, settled: false
+      coinEarned, repaired: false, titles, settled: false,
+      checkedIn: canCheckin
     });
     showToast('✅ 已添加 ' + date + ' 的记录（未结算，请手动结算）');
   }
