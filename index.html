@@ -1622,7 +1622,7 @@
       1 金币 = 1 元人民币<br>
       1 学分 = 1 工分 = 1 健康分 = 2 基础分<br>
       10 基础分 = 1 元人民币<br>
-      消费优先级：金币 → 基础分（逐级扣减）
+      消费优先级：金币 → 学分 → 工分 → 健康分 → 基础分（逐级扣减）
     </div>
   </div>
 </div>
@@ -1951,9 +1951,9 @@
     <div class="rule-box">
       <span class="hl">汇率铁律：</span><br>
       1 金币 = 1 元人民币<br>
-      10 基础分 = 1 元人民币<br><br>
+      5 学分 = 5 工分 = 5 健康分 = 10 基础分 = 1 元人民币<br>
       消费范围：品质生活内容（旅游、数码、餐饮、课程等）<br>
-      <span class="hl">消费优先级：</span>金币 → 基础分（逐级扣减）
+      <span class="hl">消费优先级：</span>金币 → 学分 → 工分 → 健康分 → 基础分（逐级扣减）
     </div>
   </div>
 
@@ -3102,50 +3102,81 @@ function useCoupon() {
   showToast(`✅ 已补签 ${date}`);
 }
 
-// ========== 消费（优先扣金币→基础分） ==========
+// ========== 消费（优先扣金币→学分→工分→健康分→基础分） ==========
 function spendMoney() {
   const desc = document.getElementById('spendDesc').value.trim();
   const cny  = parseFloat(document.getElementById('spendCny').value) || 0;
   if (!desc) { showToast('请填写消费说明'); return; }
   if (cny <= 0) { showToast('消费金额无效'); return; }
 
-  // 汇率：1金币=1元，10基础分=1元
+  // 汇率：1金币=1元，5学分=5工分=5健康分=10基础分=1元
+  // 即：1学分=1工分=1健康分=2基础分=0.2元
   var needCny = cny;
-  var baseTotal  = G.basePoints  || 0;
-  var coinsCny   = G.coins * 1;
-  var baseCny    = baseTotal  * 0.1;
-  var totalCny   = coinsCny + baseCny;
+  var baseTotal   = G.basePoints  || 0;
+  var coinsCny    = G.coins * 1;
+  var studyCny    = (G.studyPoints || 0) * 0.2;
+  var workCny     = (G.workPoints  || 0) * 0.2;
+  var sportCny    = (G.sportPoints || 0) * 0.2;
+  var baseCny     = baseTotal * 0.1;
+  var totalCny    = coinsCny + studyCny + workCny + sportCny + baseCny;
 
   if (totalCny < needCny) {
     showToast('总资产不足（¥' + totalCny.toFixed(2) + '），需要 ¥' + needCny.toFixed(2));
     return;
   }
 
-  var coinsUsed = 0, baseUsed = 0;
+  var coinsUsed = 0, studyUsed = 0, workUsed = 0, sportUsed = 0, baseUsed = 0;
   var remainCny = needCny;
 
-  // 第1级：扣金币
-  if (remainCny > 0) {
+  // 第1级：扣金币（1金币=1元）
+  if (remainCny > 0 && G.coins > 0) {
     if (G.coins >= remainCny) { coinsUsed = remainCny; remainCny = 0; }
     else { coinsUsed = G.coins; remainCny -= coinsUsed; }
   }
 
-  // 第2级：扣基础分（10基础分=1元）
+  // 第2级：扣学分（1学分=0.2元，5学分=1元）
+  if (remainCny > 0 && G.studyPoints > 0) {
+    var maxStudyCny = G.studyPoints * 0.2;
+    if (maxStudyCny >= remainCny) { studyUsed = Math.ceil(remainCny / 0.2); remainCny = 0; }
+    else { studyUsed = G.studyPoints; remainCny -= maxStudyCny; }
+  }
+
+  // 第3级：扣工分（1工分=0.2元）
+  if (remainCny > 0 && G.workPoints > 0) {
+    var maxWorkCny = G.workPoints * 0.2;
+    if (maxWorkCny >= remainCny) { workUsed = Math.ceil(remainCny / 0.2); remainCny = 0; }
+    else { workUsed = G.workPoints; remainCny -= maxWorkCny; }
+  }
+
+  // 第4级：扣健康分（1健康分=0.2元）
+  if (remainCny > 0 && G.sportPoints > 0) {
+    var maxSportCny = G.sportPoints * 0.2;
+    if (maxSportCny >= remainCny) { sportUsed = Math.ceil(remainCny / 0.2); remainCny = 0; }
+    else { sportUsed = G.sportPoints; remainCny -= maxSportCny; }
+  }
+
+  // 第5级：扣基础分（1基础分=0.1元，10基础分=1元）
   if (remainCny > 0 && baseTotal > 0) {
-    var baseCoversCny = baseTotal * 0.1;
-    if (baseCoversCny >= remainCny) { baseUsed = Math.ceil(remainCny / 0.1); remainCny = 0; }
-    else { baseUsed = baseTotal; remainCny -= baseCoversCny; }
+    var maxBaseCny = baseTotal * 0.1;
+    if (maxBaseCny >= remainCny) { baseUsed = Math.ceil(remainCny / 0.1); remainCny = 0; }
+    else { baseUsed = baseTotal; remainCny -= maxBaseCny; }
   }
 
   G.coins -= coinsUsed;
+  G.studyPoints -= studyUsed;
+  G.workPoints -= workUsed;
+  G.sportPoints -= sportUsed;
   if (baseUsed  > 0) G.basePoints  -= baseUsed;
 
   var parts = [];
   if (coinsUsed > 0) parts.push(coinsUsed + '金币');
+  if (studyUsed > 0) parts.push(studyUsed + '学分');
+  if (workUsed  > 0) parts.push(workUsed  + '工分');
+  if (sportUsed > 0) parts.push(sportUsed + '健康分');
   if (baseUsed  > 0) parts.push(baseUsed  + '基础分');
   var detail = '扣除 ' + parts.join(' + ');
 
-  G.spends.push({ date: today(), desc, cny, coinsUsed, baseUsed });
+  G.spends.push({ date: today(), desc, cny, coinsUsed, studyUsed, workUsed, sportUsed, baseUsed });
   document.getElementById('spendDesc').value = '';
   document.getElementById('spendCny').value  = '';
   saveData(G);
@@ -3344,14 +3375,17 @@ function renderWallet() {
   var baseTotal  = G.basePoints  || 0;
   var coins      = G.coins || 0;
   var coinsCny   = coins * 1;
-  var baseCny    = baseTotal  * 0.1;
-  var totalCny   = coinsCny + baseCny;
+  var studyCny   = (G.studyPoints || 0) * 0.2;
+  var workCny    = (G.workPoints  || 0) * 0.2;
+  var sportCny    = (G.sportPoints || 0) * 0.2;
+  var baseCny    = baseTotal * 0.1;
+  var totalCny   = coinsCny + studyCny + workCny + sportCny + baseCny;
 
   document.getElementById('wallet-coins').textContent       = coins.toFixed(0);
   document.getElementById('wallet-cny').textContent         = '≈ ¥' + coinsCny.toFixed(2);
-  document.getElementById('wallet-study').textContent       = (G.studyPoints || 0) + ' 学分（累计）';
-  document.getElementById('wallet-work').textContent        = (G.workPoints  || 0) + ' 工分（累计）';
-  document.getElementById('wallet-sport').textContent       = (G.sportPoints || 0) + ' 运动分（累计）';
+  document.getElementById('wallet-study').textContent       = (G.studyPoints || 0) + ' 学分（≈ ¥' + studyCny.toFixed(2) + '）';
+  document.getElementById('wallet-work').textContent        = (G.workPoints  || 0) + ' 工分（≈ ¥' + workCny.toFixed(2) + '）';
+  document.getElementById('wallet-sport').textContent       = (G.sportPoints || 0) + ' 健康分（≈ ¥' + sportCny.toFixed(2) + '）';
   document.getElementById('wallet-base').textContent        = baseTotal  + ' 分（≈ ¥' + baseCny.toFixed(2) + '）';
   document.getElementById('wallet-coupons').textContent     = G.coupons + ' 张';
   document.getElementById('wallet-total-cny').textContent   = '≈ ¥' + totalCny.toFixed(2);
