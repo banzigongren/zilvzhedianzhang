@@ -1597,6 +1597,26 @@
     <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">结算后以上资产将计入钱包</div>
   </div>
 
+  <div class="card" style="border-color:rgba(245,166,35,0.2);">
+    <div class="card-title"><span class="icon">📊</span>附加分池（可填充至未打卡日期）</div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted);">
+      <span>学习附加池</span>
+      <span style="color:#a29bfe;" id="wallet-bonus-study">0 分</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>工作附加池</span>
+      <span style="color:#55efc4;" id="wallet-bonus-work">0 分</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>运动附加池</span>
+      <span style="color:var(--accent);" id="wallet-bonus-sport">0 分</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;">
+      附加分为每日超出门槛的分钟数（学习&gt;120min / 工作&gt;360min / 运动&gt;5min）<br>
+      可填充到未打卡日期，满足条件后自动补打卡
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title"><span class="icon">💸</span>消费记录</div>
     <div class="input-group">
@@ -2393,6 +2413,68 @@
 </div>
 
 <!-- ============================== -->
+<!-- FILL BONUS MODAL               -->
+<!-- ============================== -->
+<div class="manual-modal-overlay" id="fillBonusOverlay" style="display:none;">
+  <div class="manual-modal">
+    <button class="close-btn" onclick="closeFillBonusModal()">✕</button>
+    <h2 style="text-align:center;color:#c8d6ff;margin-bottom:8px;font-size:18px;letter-spacing:2px;">📊 填充附加分</h2>
+    <p style="text-align:center;font-size:12px;color:#888;margin-bottom:12px;">将附加分池中的分数填充到该日期，满足条件后自动补打卡</p>
+    <div style="font-size:13px;color:var(--teal);text-align:center;margin-bottom:12px;" id="fillBonusTargetDate">目标日期：--</div>
+
+    <!-- 当前池余额 -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div style="flex:1;background:var(--card2);border-radius:8px;padding:8px;text-align:center;border:1px solid var(--border);">
+        <div style="font-size:18px;font-weight:700;color:#a29bfe;" id="fillPoolStudy">0</div>
+        <div style="font-size:11px;color:var(--muted);">学习附加池</div>
+      </div>
+      <div style="flex:1;background:var(--card2);border-radius:8px;padding:8px;text-align:center;border:1px solid var(--border);">
+        <div style="font-size:18px;font-weight:700;color:#55efc4;" id="fillPoolWork">0</div>
+        <div style="font-size:11px;color:var(--muted);">工作附加池</div>
+      </div>
+      <div style="flex:1;background:var(--card2);border-radius:8px;padding:8px;text-align:center;border:1px solid var(--border);">
+        <div style="font-size:18px;font-weight:700;color:var(--accent);" id="fillPoolSport">0</div>
+        <div style="font-size:11px;color:var(--muted);">运动附加池</div>
+      </div>
+    </div>
+
+    <!-- 当前记录分数 -->
+    <div style="background:var(--card2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;border:1px solid var(--border);">
+      <div style="color:var(--muted);margin-bottom:4px;">该日期现有分数</div>
+      <div id="fillCurrentScores" style="color:#ccc;"></div>
+    </div>
+
+    <!-- 填充输入 -->
+    <div class="manual-section">
+      <div class="manual-section-title">📝 填充数量</div>
+      <div class="manual-row">
+        <label style="color:#a29bfe;">学习</label>
+        <input type="number" id="fillStudyInput" min="0" max="9999" placeholder="0" inputmode="numeric" oninput="updateFillPreview()">
+        <span class="unit">分</span>
+      </div>
+      <div class="manual-row">
+        <label style="color:#55efc4;">工作</label>
+        <input type="number" id="fillWorkInput" min="0" max="9999" placeholder="0" inputmode="numeric" oninput="updateFillPreview()">
+        <span class="unit">分</span>
+      </div>
+      <div class="manual-row">
+        <label style="color:var(--accent);">运动</label>
+        <input type="number" id="fillSportInput" min="0" max="9999" placeholder="0" inputmode="numeric" oninput="updateFillPreview()">
+        <span class="unit">分</span>
+      </div>
+    </div>
+
+    <!-- 实时预览 -->
+    <div id="fillPreview" style="margin:12px 0;padding:10px;background:var(--card2);border-radius:8px;font-size:12px;color:var(--muted);text-align:center;min-height:40px;border:1px solid var(--border);"></div>
+
+    <button class="btn btn-green" onclick="fillBonusConfirm()">✅ 确认填充</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;">
+      ⚠️ 填充后附加分从池中扣除，不可退回
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
 <!-- JAVASCRIPT                      -->
 <!-- ============================== -->
 <script>
@@ -2501,6 +2583,15 @@ if (!G.records) { G.records = []; saveData(G); }
 if (!G.studyBonusPool) { G.studyBonusPool = 0; saveData(G); }
 if (!G.workBonusPool) { G.workBonusPool = 0; saveData(G); }
 if (!G.sportBonusPool) { G.sportBonusPool = 0; saveData(G); }
+
+// ===== 填充附加分字段迁移 =====
+var _needFillMigrate = false;
+for (var _fi = 0; _fi < G.records.length; _fi++) {
+  if (G.records[_fi].filledStudyBonus === undefined) { G.records[_fi].filledStudyBonus = 0; _needFillMigrate = true; }
+  if (G.records[_fi].filledWorkBonus === undefined)  { G.records[_fi].filledWorkBonus = 0;  _needFillMigrate = true; }
+  if (G.records[_fi].filledSportBonus === undefined) { G.records[_fi].filledSportBonus = 0; _needFillMigrate = true; }
+}
+if (_needFillMigrate) saveData(G);
 
 // ===== 结算系统迁移 =====
 // 旧记录默认为已结算（保持兼容）
@@ -3187,6 +3278,176 @@ function useCoupon() {
   showToast(`✅ 已补签 ${date}`);
 }
 
+// ========== 填充附加分 ==========
+// 判断含填充附加分后是否满足打卡条件
+function canCheckinWithFilled(record) {
+  var sw = (record.studyM || 0) + (record.workM || 0)
+         + (record.filledStudyBonus || 0) + (record.filledWorkBonus || 0);
+  var sp = (record.sportM || 0) + (record.filledSportBonus || 0);
+  return { canCheckin: sw >= 480 && sp >= 5, studyWorkTotal: sw, sportTotal: sp };
+}
+
+// 执行填充附加分到指定日期
+function fillBonusToDate(date, sFill, wFill, spFill) {
+  sFill = Math.max(0, Math.floor(sFill || 0));
+  wFill = Math.max(0, Math.floor(wFill || 0));
+  spFill = Math.max(0, Math.floor(spFill || 0));
+  if (sFill + wFill + spFill === 0) { showToast('请输入要填充的附加分'); return false; }
+
+  // 校验池余额
+  if (sFill > G.studyBonusPool) { showToast('学习附加池不足（剩余' + G.studyBonusPool + '）'); return false; }
+  if (wFill > G.workBonusPool)  { showToast('工作附加池不足（剩余' + G.workBonusPool + '）'); return false; }
+  if (spFill > G.sportBonusPool) { showToast('运动附加池不足（剩余' + G.sportBonusPool + '）'); return false; }
+
+  // 查找或创建记录
+  var rec = G.records.find(function(r) { return r.date === date; });
+  if (!rec) {
+    // 无记录，自动创建空白记录
+    var sc = calcScores(0, 0, 0, 0, 0, 0);
+    rec = {
+      date: date,
+      studyM: 0, workM: 0, sportM: 0, wasteM: 0, funM: 0, dailyM: 0,
+      sleepH: 23, sleepM: 0,
+      base: sc.base, studyScore: 0, studyBonus: 0,
+      workScore: 0, workBonus: 0, sportScore: 0, sportBonus: 0,
+      earnedStudy: 0, earnedWork: 0, earnedSport: 0, earnedBase: sc.base,
+      coinEarned: 0, checkedIn: false, repaired: false, settled: false, titles: {},
+      filledStudyBonus: 0, filledWorkBonus: 0, filledSportBonus: 0
+    };
+    G.records.push(rec);
+  }
+
+  // 已结算的记录不允许填充
+  if (rec.settled) { showToast('该日期已结算，无法填充'); return false; }
+
+  // 累加填充值
+  rec.filledStudyBonus = (rec.filledStudyBonus || 0) + sFill;
+  rec.filledWorkBonus  = (rec.filledWorkBonus  || 0) + wFill;
+  rec.filledSportBonus = (rec.filledSportBonus || 0) + spFill;
+
+  // 从池中扣除
+  G.studyBonusPool -= sFill;
+  G.workBonusPool  -= wFill;
+  G.sportBonusPool -= spFill;
+
+  // 判断填充后是否满足打卡条件
+  var ck = canCheckinWithFilled(rec);
+  if (ck.canCheckin) {
+    rec.checkedIn = true;
+    showToast('✅ 填充成功，已满足打卡条件，自动补打卡！');
+  } else {
+    var lack = [];
+    if (ck.studyWorkTotal < 480) lack.push('学工合计差' + (480 - ck.studyWorkTotal) + '分');
+    if (ck.sportTotal < 5) lack.push('健康差' + (5 - ck.sportTotal) + '分');
+    showToast('📊 填充成功，但' + lack.join('，') + '，仍未满足打卡条件');
+  }
+
+  saveData(G);
+  renderAll();
+  return true;
+}
+
+// 填充附加分 Modal 控制
+var _fillBonusDate = '';
+
+function openFillBonusModal(date) {
+  _fillBonusDate = date;
+  var overlay = document.getElementById('fillBonusOverlay');
+  if (!overlay) return;
+
+  // 显示目标日期
+  document.getElementById('fillBonusTargetDate').textContent = '目标日期：' + date;
+
+  // 显示当前池余额
+  document.getElementById('fillPoolStudy').textContent = G.studyBonusPool || 0;
+  document.getElementById('fillPoolWork').textContent  = G.workBonusPool  || 0;
+  document.getElementById('fillPoolSport').textContent = G.sportBonusPool || 0;
+
+  // 显示该日期现有分数
+  var rec = G.records.find(function(r) { return r.date === date; });
+  if (rec) {
+    var swNow = (rec.studyM || 0) + (rec.workM || 0);
+    var spNow = rec.sportM || 0;
+    var filledSw = (rec.filledStudyBonus || 0) + (rec.filledWorkBonus || 0);
+    var filledSp = rec.filledSportBonus || 0;
+    document.getElementById('fillCurrentScores').innerHTML =
+      '学工合计: <b style="color:#a29bfe;">' + swNow + '</b> 分' +
+      (filledSw > 0 ? ' + 已填充 <b style="color:var(--gold);">' + filledSw + '</b>' : '') +
+      ' ｜ 健康: <b style="color:var(--accent);">' + spNow + '</b> 分' +
+      (filledSp > 0 ? ' + 已填充 <b style="color:var(--gold);">' + filledSp + '</b>' : '');
+  } else {
+    document.getElementById('fillCurrentScores').innerHTML = '<span style="color:var(--muted);">无记录（将自动创建空白记录）</span>';
+  }
+
+  // 清空输入
+  document.getElementById('fillStudyInput').value = '';
+  document.getElementById('fillWorkInput').value = '';
+  document.getElementById('fillSportInput').value = '';
+  document.getElementById('fillPreview').innerHTML = '<span style="color:var(--muted);">请输入要填充的附加分数量</span>';
+
+  overlay.style.display = 'flex';
+}
+
+function closeFillBonusModal() {
+  document.getElementById('fillBonusOverlay').style.display = 'none';
+  _fillBonusDate = '';
+}
+
+function updateFillPreview() {
+  var sFill = Math.max(0, parseInt(document.getElementById('fillStudyInput').value) || 0);
+  var wFill = Math.max(0, parseInt(document.getElementById('fillWorkInput').value) || 0);
+  var spFill = Math.max(0, parseInt(document.getElementById('fillSportInput').value) || 0);
+
+  var rec = G.records.find(function(r) { return r.date === _fillBonusDate; });
+  var baseSW = rec ? ((rec.studyM || 0) + (rec.workM || 0) + (rec.filledStudyBonus || 0) + (rec.filledWorkBonus || 0)) : 0;
+  var baseSP = rec ? ((rec.sportM || 0) + (rec.filledSportBonus || 0)) : 0;
+
+  var totalSW = baseSW + sFill + wFill;
+  var totalSP = baseSP + spFill;
+
+  var el = document.getElementById('fillPreview');
+  if (sFill + wFill + spFill === 0) {
+    el.innerHTML = '<span style="color:var(--muted);">请输入要填充的附加分数量</span>';
+    return;
+  }
+
+  var parts = [];
+  if (sFill > 0) parts.push('学习+' + sFill);
+  if (wFill > 0) parts.push('工作+' + wFill);
+  if (spFill > 0) parts.push('运动+' + spFill);
+
+  // 检查是否超出池余额
+  var warnings = [];
+  if (sFill > G.studyBonusPool) warnings.push('学习附加池不足');
+  if (wFill > G.workBonusPool) warnings.push('工作附加池不足');
+  if (spFill > G.sportBonusPool) warnings.push('运动附加池不足');
+
+  if (warnings.length > 0) {
+    el.innerHTML = '<span style="color:var(--accent);">⚠️ ' + warnings.join('，') + '</span>';
+    return;
+  }
+
+  var condSW = totalSW >= 480;
+  var condSP = totalSP >= 5;
+
+  el.innerHTML =
+    '<div>填充: ' + parts.join('，') + '</div>' +
+    '<div style="margin-top:6px;">学工合计: <b style="color:' + (condSW ? 'var(--green)' : 'var(--accent)') + ';">' + totalSW + '</b>/480' +
+    ' ｜ 健康: <b style="color:' + (condSP ? 'var(--green)' : 'var(--accent)') + ';">' + totalSP + '</b>/5</div>' +
+    '<div style="margin-top:4px;color:' + ((condSW && condSP) ? 'var(--green)' : 'var(--accent)') + ';font-weight:600;">' +
+    ((condSW && condSP) ? '✅ 满足打卡条件，填充后自动补打卡' : '🔒 填充后仍未满足打卡条件') + '</div>';
+}
+
+function fillBonusConfirm() {
+  var sFill = Math.max(0, parseInt(document.getElementById('fillStudyInput').value) || 0);
+  var wFill = Math.max(0, parseInt(document.getElementById('fillWorkInput').value) || 0);
+  var spFill = Math.max(0, parseInt(document.getElementById('fillSportInput').value) || 0);
+
+  if (fillBonusToDate(_fillBonusDate, sFill, wFill, spFill)) {
+    closeFillBonusModal();
+  }
+}
+
 // ========== 消费（优先扣金币→学分→工分→健康分→基础分） ==========
 function spendMoney() {
   const desc = document.getElementById('spendDesc').value.trim();
@@ -3477,6 +3738,14 @@ function renderWallet() {
   document.getElementById('wallet-base').textContent        = baseTotal  + ' 分（≈ ¥' + baseCny.toFixed(2) + '）';
   document.getElementById('wallet-coupons').textContent     = G.coupons + ' 张';
   document.getElementById('wallet-total-cny').textContent   = '≈ ¥' + totalCny.toFixed(2);
+
+  // 附加分池
+  var elBS = document.getElementById('wallet-bonus-study');
+  if (elBS) elBS.textContent = (G.studyBonusPool || 0) + ' 分';
+  var elBW = document.getElementById('wallet-bonus-work');
+  if (elBW) elBW.textContent = (G.workBonusPool || 0) + ' 分';
+  var elBSp = document.getElementById('wallet-bonus-sport');
+  if (elBSp) elBSp.textContent = (G.sportBonusPool || 0) + ' 分';
 
   // 计算未结算资产
   var uCoins = 0, uStudy = 0, uWork = 0, uSport = 0, uBase = 0;
@@ -3799,12 +4068,26 @@ function renderHistory() {
       : (r.checkedIn
         ? '<span class="badge badge-green">已打卡</span>'
         : '<span class="badge badge-red">未打卡</span>');
+    // 已填充附加分显示
+    var filledInfo = '';
+    if ((r.filledStudyBonus||0) + (r.filledWorkBonus||0) + (r.filledSportBonus||0) > 0) {
+      var fillParts = [];
+      if (r.filledStudyBonus) fillParts.push('学+' + r.filledStudyBonus);
+      if (r.filledWorkBonus) fillParts.push('工+' + r.filledWorkBonus);
+      if (r.filledSportBonus) fillParts.push('运+' + r.filledSportBonus);
+      filledInfo = '<div style="font-size:11px;color:var(--gold);margin-top:4px;">📊 填充: ' + fillParts.join(' ') + '</div>';
+    }
+    // 填充附加分按钮（未打卡且未结算的记录显示）
+    var fillBtn = (!r.checkedIn && !r.settled)
+      ? '<button class="history-action-btn" title="填充附加分" onclick="openFillBonusModal(\'' + r.date + '\')" style="color:var(--gold);">📊</button>'
+      : '';
     return `
       <div class="history-item">
         <div class="history-actions">
           <button class="history-action-btn" title="日程" onclick="openScheduleModal('${r.date}')">📅</button>
           ${!r.settled ? '<button class="history-action-btn" title="编辑" onclick="openManualCheckinModal(\'' + r.date + '\')">✏️</button>' : ''}
           <button class="history-action-btn" title="删除" onclick="deleteCheckinRecord('${r.date}')">🗑️</button>
+          ${fillBtn}
           ${settleBtn}
         </div>
         <div class="history-date">${formatDate(r.date)}</div>
@@ -3820,6 +4103,7 @@ function renderHistory() {
           <span class="history-total">学${r.studyScore+r.studyBonus} 工${r.workScore+r.workBonus} 运${r.sportScore+r.sportBonus} 基${r.base}</span>
           <span style="color:var(--gold);font-size:13px;">+${r.coinEarned}金币</span>
         </div>
+        ${filledInfo}
       </div>`;
   }).join('') + G.repairedDays.map(d => `
     <div class="history-item" style="border-color:rgba(245,166,35,0.3);">
