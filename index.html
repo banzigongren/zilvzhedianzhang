@@ -1352,14 +1352,11 @@
 
 <!-- ===== TABS ===== -->
 <div class="tabs">
+  <div class="tab active" onclick="switchTab('stats')">
+    <span class="tab-icon">📊</span>今日
+  </div>
   <div class="tab" onclick="switchTab('sleep')">
     <span class="tab-icon">🌙</span>睡眠
-  </div>
-  <div class="tab active" onclick="switchTab('checkin')">
-    <span class="tab-icon">📝</span>打卡
-  </div>
-  <div class="tab" onclick="switchTab('stats')">
-    <span class="tab-icon">📊</span>今日
   </div>
   <div class="tab" onclick="switchTab('wallet')">
     <span class="tab-icon">💰</span>钱包
@@ -1379,145 +1376,145 @@
 </div>
 
 <!-- ============================== -->
-<!-- PAGE: 打卡                      -->
+<!-- PAGE: 今日统计（含打卡输入）    -->
 <!-- ============================== -->
-<div class="page active" id="page-checkin">
+<div class="page active" id="page-stats">
 
-  <div class="card" id="sleepDurationCard">
-    <div class="card-title"><span class="icon">🌙</span>今日睡眠时间</div>
-    <div id="sleepDurationContent" style="font-size:14px; color:var(--muted);">加载中…</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">📚</span>今日学习时间</div>
-    <div class="input-row">
-      <input class="input-field" type="number" id="studyMin" min="0" max="600" placeholder="0" inputmode="numeric" />
-      <span class="input-unit">分钟</span>
+  <!-- 打卡输入区 -->
+  <div id="checkinInputArea">
+    <div class="card" id="sleepDurationCard">
+      <div class="card-title"><span class="icon">🌙</span>今日睡眠时间</div>
+      <div id="sleepDurationContent" style="font-size:14px; color:var(--muted);">加载中…</div>
     </div>
-    <div class="progress-wrap">
-      <div class="progress-info">
-        <span>目标：120分钟</span>
-        <span id="studyPct">0%</span>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">📚</span>今日学习时间</div>
+      <div class="input-row">
+        <input class="input-field" type="number" id="studyMin" min="0" max="600" placeholder="0" inputmode="numeric" />
+        <span class="input-unit">分钟</span>
       </div>
-      <div class="progress-bar"><div class="progress-fill fill-purple" id="studyBar" style="width:0%"></div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">💼</span>今日工作时间</div>
-    <div class="input-row">
-      <input class="input-field" type="number" id="workMin" min="0" max="720" placeholder="0" inputmode="numeric" />
-      <span class="input-unit">分钟</span>
-    </div>
-    <div class="progress-wrap">
-      <div class="progress-info">
-        <span>目标：360分钟（6小时）</span>
-        <span id="workPct">0%</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill fill-teal" id="workBar" style="width:0%"></div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">🏃</span>今日运动时间</div>
-    <div class="input-row">
-      <input class="input-field" type="number" id="sportMin" min="0" max="300" placeholder="0" inputmode="numeric" />
-      <span class="input-unit">分钟</span>
-    </div>
-    <div class="progress-wrap">
-      <div class="progress-info">
-        <span>目标：5分钟</span>
-        <span id="sportPct">0%</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill fill-red" id="sportBar" style="width:0%"></div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">📵</span>今日浪费时间</div>
-    <div class="input-row">
-      <input class="input-field" type="number" id="phoneMin" min="0" max="600" placeholder="0" inputmode="numeric" />
-      <span class="input-unit">分钟</span>
-    </div>
-  <div style="margin-top:8px; font-size:12px; color:var(--muted);">
-    基础分 = 1440 - 浪费时间（不含学习/工作/运动时段）
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-title"><span class="icon">🎮</span>今日娱乐时间</div>
-  <div class="input-row">
-    <input class="input-field" type="number" id="funMin" min="0" max="600" placeholder="0" inputmode="numeric" />
-    <span class="input-unit">分钟</span>
-  </div>
-  <div style="margin-top:8px; font-size:12px; color:var(--muted);">
-    娱乐得基础分（1分/分钟），无额外加分
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-title"><span class="icon">🏠</span>今日日常时间</div>
-  <div class="input-row">
-    <input class="input-field" type="number" id="dailyMin" min="0" max="600" placeholder="0" inputmode="numeric" />
-    <span class="input-unit">分钟</span>
-  </div>
-  <div style="margin-top:8px; font-size:12px; color:var(--muted);">
-    日常得基础分（1分/分钟），无额外加分
-  </div>
-</div>
-
-  <!-- 实时预览 -->
-  <div class="card" id="dailyTitleCard" style="display:none;">
-    <div class="card-title"><span class="icon">⚔️</span>每日称号挑战</div>
-    <div class="title-grid" id="dailyTitleGrid"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">✨</span>今日得分预览</div>
-    <div class="score-grid">
-      <div class="score-item">
-        <div class="score-val base" id="prev-base">0</div>
-        <div class="score-lbl">基础分</div>
-      </div>
-      <div class="score-item">
-        <div class="score-val study" id="prev-study">0</div>
-        <div class="score-lbl">学分</div>
-      </div>
-      <div class="score-item">
-        <div class="score-val work" id="prev-work">0</div>
-        <div class="score-lbl">工分</div>
-      </div>
-      <div class="score-item">
-        <div class="score-val health" id="prev-health">0</div>
-        <div class="score-lbl">运动分</div>
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span>目标：120分钟</span>
+          <span id="studyPct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-purple" id="studyBar" style="width:0%"></div></div>
       </div>
     </div>
-    <div class="divider"></div>
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <span style="color:var(--muted); font-size:13px;">学+工+运动分合计</span>
-      <span class="score-val total" id="prev-total">0</span>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">💼</span>今日工作时间</div>
+      <div class="input-row">
+        <input class="input-field" type="number" id="workMin" min="0" max="720" placeholder="0" inputmode="numeric" />
+        <span class="input-unit">分钟</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span>目标：360分钟（6小时）</span>
+          <span id="workPct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-teal" id="workBar" style="width:0%"></div></div>
+      </div>
     </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-      <span style="color:var(--muted); font-size:13px;">睡眠金币</span>
-      <span style="color:var(--gold); font-size:18px; font-weight:700;" id="prev-coin">0</span>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🏃</span>今日运动时间</div>
+      <div class="input-row">
+        <input class="input-field" type="number" id="sportMin" min="0" max="300" placeholder="0" inputmode="numeric" />
+        <span class="input-unit">分钟</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span>目标：5分钟</span>
+          <span id="sportPct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-red" id="sportBar" style="width:0%"></div></div>
+      </div>
     </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-      <span style="color:var(--muted); font-size:13px;">等值人民币</span>
-      <span style="color:#ccc; font-size:14px; font-weight:600;" id="prev-cny">¥0.00</span>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">📵</span>今日浪费时间</div>
+      <div class="input-row">
+        <input class="input-field" type="number" id="phoneMin" min="0" max="600" placeholder="0" inputmode="numeric" />
+        <span class="input-unit">分钟</span>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--muted);">
+        基础分 = 1440 - 浪费时间（不含学习/工作/运动时段）
+      </div>
     </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🎮</span>今日娱乐时间</div>
+      <div class="input-row">
+        <input class="input-field" type="number" id="funMin" min="0" max="600" placeholder="0" inputmode="numeric" />
+        <span class="input-unit">分钟</span>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--muted);">
+        娱乐得基础分（1分/分钟），无额外加分
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🏠</span>今日日常时间</div>
+      <div class="input-row">
+        <input class="input-field" type="number" id="dailyMin" min="0" max="600" placeholder="0" inputmode="numeric" />
+        <span class="input-unit">分钟</span>
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:var(--muted);">
+        日常得基础分（1分/分钟），无额外加分
+      </div>
+    </div>
+
+    <!-- 每日称号挑战 -->
+    <div class="card" id="dailyTitleCard" style="display:none;">
+      <div class="card-title"><span class="icon">⚔️</span>每日称号挑战</div>
+      <div class="title-grid" id="dailyTitleGrid"></div>
+    </div>
+
+    <!-- 得分预览 -->
+    <div class="card">
+      <div class="card-title"><span class="icon">✨</span>今日得分预览</div>
+      <div class="score-grid">
+        <div class="score-item">
+          <div class="score-val base" id="prev-base">0</div>
+          <div class="score-lbl">基础分</div>
+        </div>
+        <div class="score-item">
+          <div class="score-val study" id="prev-study">0</div>
+          <div class="score-lbl">学分</div>
+        </div>
+        <div class="score-item">
+          <div class="score-val work" id="prev-work">0</div>
+          <div class="score-lbl">工分</div>
+        </div>
+        <div class="score-item">
+          <div class="score-val health" id="prev-health">0</div>
+          <div class="score-lbl">运动分</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:var(--muted); font-size:13px;">学+工+运动分合计</span>
+        <span class="score-val total" id="prev-total">0</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+        <span style="color:var(--muted); font-size:13px;">睡眠金币</span>
+        <span style="color:var(--gold); font-size:18px; font-weight:700;" id="prev-coin">0</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+        <span style="color:var(--muted); font-size:13px;">等值人民币</span>
+        <span style="color:#ccc; font-size:14px; font-weight:600;" id="prev-cny">¥0.00</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveCheckin()">📋 保存</button>
+    <button class="btn btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#f5a623,#e94560);" onclick="settleDate(today())">💰 结算今日</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">保存=仅存日程；结算=资产计入钱包（结算后不可改）</div>
+    <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(26,188,156,0.15);color:var(--teal);" onclick="syncFromSchedule()">📅 从日程同步</button>
+    <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(255,255,255,0.05);color:var(--muted);" onclick="openManualCheckinModal()">📝 补记/编辑其他日期</button>
   </div>
 
-  <button class="btn btn-primary" onclick="saveCheckin()">📋 保存</button>
-  <button class="btn btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#f5a623,#e94560);" onclick="settleDate(today())">💰 结算今日</button>
-  <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">保存=仅存日程；结算=资产计入钱包（结算后不可改）</div>
-  <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(26,188,156,0.15);color:var(--teal);" onclick="syncFromSchedule()">📅 从日程同步</button>
-  <button class="btn btn-sm" style="width:100%;margin-top:8px;background:rgba(255,255,255,0.05);color:var(--muted);" onclick="openManualCheckinModal()">📝 补记/编辑其他日期</button>
-</div>
-
-<!-- ============================== -->
-<!-- PAGE: 今日统计                  -->
-<!-- ============================== -->
-<div class="page" id="page-stats">
+  <!-- 统计报告区 -->
   <div id="statsContent">
     <div class="empty">
       <div class="empty-icon">📊</div>
@@ -3175,7 +3172,7 @@ function renderStats() {
 
   var statsCards = '';
   if (!rec) {
-    statsCards = '<div class="empty" style="padding:16px 0;"><div class="empty-icon">📊</div>今日尚未打卡，请先完成打卡</div>';
+    statsCards = '<div class="empty" style="padding:8px 0;font-size:13px;color:var(--muted);">📊 填写上方数据并保存后，此处显示今日统计</div>';
   } else {
     const sleepLabel = (() => {
       const t = rec.sleepH * 60 + rec.sleepM;
@@ -3713,9 +3710,9 @@ function switchTab(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
-  const tabMap = { checkin:0, stats:1, wallet:2, streak:3, history:4, timer:5, sleep:6, rules:7 };
+  const tabMap = { stats:0, sleep:1, wallet:2, streak:3, history:4, timer:5, rules:6 };
   document.querySelectorAll('.tab')[tabMap[id]].classList.add('active');
-  if (id === 'stats')   renderStats();
+  if (id === 'stats')   { renderStats(); updatePreview(); refreshSleepDuration(); }
   if (id === 'wallet')  renderWallet();
   if (id === 'streak')  renderStreak();
   if (id === 'history') renderHistory();
@@ -4505,7 +4502,7 @@ function syncSleepToCheckin() {
   const latestLog = todayLogs[todayLogs.length - 1];
   updatePreview();
   refreshSleepDuration();
-  switchTab('checkin');
+  switchTab('stats');
   showToast(`🌙 已同步：入睡 ${String(latestLog.sleepH).padStart(2,'0')}:${String(latestLog.sleepM).padStart(2,'0')}，+${latestLog.coins} 金币`);
 }
 
