@@ -1485,7 +1485,7 @@
   </div>
 
   <div class="card">
-    <div class="card-title"><span class="icon">✨</span>今日积分预览</div>
+    <div class="card-title"><span class="icon">✨</span>今日得分预览</div>
     <div class="score-grid">
       <div class="score-item">
         <div class="score-val base" id="prev-base">0</div>
@@ -1506,7 +1506,7 @@
     </div>
     <div class="divider"></div>
     <div style="display:flex; justify-content:space-between; align-items:center;">
-      <span style="color:var(--muted); font-size:13px;">今日积分</span>
+      <span style="color:var(--muted); font-size:13px;">学+工+运动分合计</span>
       <span class="score-val total" id="prev-total">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
@@ -1550,12 +1550,16 @@
     </div>
     <div class="divider"></div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted);">
-      <span>累计积分（学+工+健康）</span>
-      <span style="color:#a29bfe;" id="wallet-points">0</span>
+      <span>累计学分</span>
+      <span style="color:#a29bfe;" id="wallet-study">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
-      <span>积分价值</span>
-      <span style="color:#a29bfe;" id="wallet-points-cny">≈ ¥0.00</span>
+      <span>累计工分</span>
+      <span style="color:#55efc4;" id="wallet-work">0</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
+      <span>累计运动分</span>
+      <span style="color:var(--accent);" id="wallet-sport">0</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px;">
       <span>累计基础分</span>
@@ -1598,8 +1602,10 @@
   <div class="card">
     <div class="card-title"><span class="icon">🔄</span>汇率说明</div>
     <div class="formula">
-      1 金币 = 5 积分 = 10 基础分 = 1 元人民币<br>
-      消费优先级：金币 → 积分 → 基础分
+      1 金币 = 1 元人民币<br>
+      1 学分 = 1 工分 = 1 运动分 = 0.2 元<br>
+      10 基础分 = 1 元人民币<br>
+      消费优先级：金币 → 学分 → 工分 → 运动分 → 基础分
     </div>
   </div>
 </div>
@@ -1861,7 +1867,7 @@
     <div class="rule-box">
       <b>👑 双线全胜</b><br>
       ◦ <span class="hl">一日之主</span>：准一日之主 + 守夜人<br>
-      ◦ 效果：当日（金币＋积分＋基础分）<span class="hl">×1.1倍</span>（双线胜利）
+      ◦ 效果：当日（金币＋学分＋工分＋运动分＋基础分）<span class="hl">×1.1倍</span>（双线胜利）
     </div>
   </div>
 
@@ -1928,8 +1934,9 @@
     <div class="rule-box">
       结算时间：每日 08:30 - 09:00（前一日数据）<br>
       <span class="hl">汇率铁律：</span><br>
-      1 金币 = 10 基础分 = 1 元人民币<br>
-      1 积分 = 2 基础分 = 0.2 元<br><br>
+      1 金币 = 1 元人民币<br>
+      1 学分 = 1 工分 = 1 运动分 = 0.2 元<br>
+      10 基础分 = 1 元人民币<br><br>
       消费范围：品质生活内容（旅游、数码、餐饮、课程等）
     </div>
   </div>
@@ -2389,7 +2396,9 @@ function loadData() {
   return {
     records: [],       // 每日记录
     coins: 0,          // 金币
-    points: 0,         // 积分（学分+工分+健康分，不含基础分）
+    studyPoints: 0,    // 累计学分
+    workPoints: 0,     // 累计工分
+    sportPoints: 0,    // 累计运动分
     basePoints: 0,     // 累计基础分
     coupons: 0,        // 补打卡券
     spends: [],        // 消费记录
@@ -2412,20 +2421,29 @@ function saveData(d) {
 
 let G = loadData();
 
-// 数据迁移：旧版 G.points 包含基础分，需要拆分出 G.basePoints
+// 数据迁移：旧版 G.points 包含积分（学+工+健康），需要拆分到三个字段
+if (G.points !== undefined) {
+  // 旧版存在 G.points，需迁移
+  if (!G.studyPoints) G.studyPoints = 0;
+  if (!G.workPoints) G.workPoints = 0;
+  if (!G.sportPoints) G.sportPoints = 0;
+  // 从记录中重建各分
+  for (var _i = 0; _i < G.records.length; _i++) {
+    var _r = G.records[_i];
+    G.studyPoints += (_r.studyScore || 0) + (_r.studyBonus || 0);
+    G.workPoints  += (_r.workScore  || 0) + (_r.workBonus  || 0);
+    G.sportPoints += (_r.sportScore || 0) + (_r.sportBonus || 0);
+  }
+  delete G.points;
+  saveData(G);
+}
+// 旧版 G.basePoints 缺失迁移
 if (!G.basePoints && G.basePoints !== 0) {
   var _migrateBase = 0;
-  for (var _i = 0; _i < G.records.length; _i++) {
-    _migrateBase += (G.records[_i].base || 0);
-    // 旧记录 total 含基础分，修正为不含基础分
-    if (G.records[_i].base && G.records[_i].total) {
-      G.records[_i].total -= G.records[_i].base;
-      if (G.records[_i].total < 0) G.records[_i].total = 0;
-    }
+  for (var _j = 0; _j < G.records.length; _j++) {
+    _migrateBase += (G.records[_j].base || 0);
   }
   G.basePoints = _migrateBase;
-  G.points -= _migrateBase; // 从 points 中减去基础分部分
-  if (G.points < 0) G.points = 0; // 安全保护
   saveData(G);
 }
 
@@ -2466,7 +2484,7 @@ function initTimePicker() {
   }
 }
 
-// ========== 积分计算核心 ==========
+// ========== 各分计算核心 ==========
 // wasteM: 浪费(0分)；funM/dailyM: 得基础分1分/分钟；study/work/sport: 2分/分钟
 function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
   // 基础分：1440 - 浪费 - 学/工/运动(互斥，不重复计基础分)
@@ -2483,7 +2501,7 @@ function calcScores(studyM, workM, sportM, wasteM, funM, dailyM) {
   const sportScore = sportM;
   const sportBonus = sportM > 5 ? (sportM - 5) : 0;
 
-  const total = studyScore + workScore + sportScore; // 积分=学分+工分+健康分（不含基础分）
+  const total = studyScore + workScore + sportScore; // 保留total字段兼容旧代码，实际各分独立追踪
   return { base, studyScore, studyBonus, workScore, workBonus, sportScore, sportBonus, total };
 }
 
@@ -2622,11 +2640,12 @@ function updatePreview() {
   document.getElementById('prev-study').textContent  = sc.studyScore + (sc.studyBonus > 0 ? `+${sc.studyBonus}` : '');
   document.getElementById('prev-work').textContent   = sc.workScore  + (sc.workBonus > 0  ? `+${sc.workBonus}`  : '');
   document.getElementById('prev-health').textContent = sc.sportScore + (sc.sportBonus > 0 ? `+${sc.sportBonus}` : '');
-  document.getElementById('prev-total').textContent  = sc.total;
+  document.getElementById('prev-total').textContent  = sc.studyScore + sc.studyBonus + sc.workScore + sc.workBonus + sc.sportScore + sc.sportBonus;
   document.getElementById('prev-coin').textContent   = coins + ' 金币';
 
   // CNY 等值
-  const cny = (sc.total * 0.2 + sc.base * 0.1 + coins).toFixed(2);
+  const totalSpecial = sc.studyScore + sc.studyBonus + sc.workScore + sc.workBonus + sc.sportScore + sc.sportBonus;
+  const cny = (totalSpecial * 0.2 + sc.base * 0.1 + coins).toFixed(2);
   document.getElementById('prev-cny').textContent = `¥${cny}`;
 
   // 进度条
@@ -2732,11 +2751,17 @@ function saveCheckin() {
   // 计算每日称号
   const titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
 
-  // 一日之主加成：当日（金币＋积分＋基础分）×1.1
-  let totalScore = sc.total;
+  // 一日之主加成：当日所有货币 ×1.1
+  let earnedStudy = sc.studyScore + sc.studyBonus;
+  let earnedWork  = sc.workScore  + sc.workBonus;
+  let earnedSport = sc.sportScore + sc.sportBonus;
+  let earnedBase  = sc.base;
   if (titles.dayMaster) {
-    coinEarned = Math.floor(coinEarned * 1.1);
-    totalScore = Math.floor(sc.total * 1.1) + Math.floor(sc.base * 0.1);
+    coinEarned  = Math.floor(coinEarned * 1.1);
+    earnedStudy = Math.floor(earnedStudy * 1.1);
+    earnedWork  = Math.floor(earnedWork  * 1.1);
+    earnedSport = Math.floor(earnedSport * 1.1);
+    earnedBase  = Math.floor(earnedBase  * 1.1);
   }
 
   const record = {
@@ -2744,16 +2769,18 @@ function saveCheckin() {
     studyM, workM, sportM, wasteM, funM, dailyM,
     sleepH, sleepM,
     ...sc,
-    total: totalScore,
+    earnedStudy, earnedWork, earnedSport, earnedBase,
     coinEarned,
     repaired: false,
     titles,
   };
 
   G.records.push(record);
-  G.coins  += coinEarned;
-  G.points += totalScore;
-  G.basePoints += sc.base;
+  G.coins       += coinEarned;
+  G.studyPoints += earnedStudy;
+  G.workPoints  += earnedWork;
+  G.sportPoints += earnedSport;
+  G.basePoints  += earnedBase;
 
   // 累计附加分池（用于兑换补打卡券）
   G.studyBonusPool += sc.studyBonus;
@@ -2770,10 +2797,10 @@ function saveCheckin() {
 
   // 称号获得提示
   let titleMsg = '';
-  if (titles.dayMaster) titleMsg = '👑 一日之主！双线全胜！（金币+积分+基础分）×1.1！';
+  if (titles.dayMaster) titleMsg = '👑 一日之主！双线全胜！所有货币×1.1！';
   else if (titles.quasiMaster) titleMsg = '⚔️ 准一日之主！五星集齐！';
   else if (titles.nightWatch) titleMsg = '🌙 守夜人！22:30前入睡！';
-  const baseMsg = `🎉 打卡成功！获得 ${coinEarned} 金币，${totalScore} 积分`;
+  const baseMsg = `🎉 打卡成功！获得 ${coinEarned} 金币，学${earnedStudy} 工${earnedWork} 运${earnedSport} 基础${earnedBase}`;
   showToast(titleMsg ? titleMsg + ' ' + baseMsg : baseMsg);
   showQuoteModal('evening');
 }
@@ -2942,80 +2969,83 @@ function useCoupon() {
   showToast(`✅ 已补签 ${date}`);
 }
 
-// ========== 消费（优先扣金币→积分→基础分） ==========
+// ========== 消费（优先扣金币→学分→工分→运动分→基础分） ==========
 function spendMoney() {
   const desc = document.getElementById('spendDesc').value.trim();
   const cny  = parseFloat(document.getElementById('spendCny').value) || 0;
   if (!desc) { showToast('请填写消费说明'); return; }
   if (cny <= 0) { showToast('消费金额无效'); return; }
 
-  // 汇率：1金币=1元，5积分=1元，10基础分=1元
+  // 汇率：1金币=1元，1学/工/运动分=0.2元，10基础分=1元
   var needCny = cny;
-  var realPoints = getRealPoints();
-  var baseTotal = G.basePoints || 0;              // 累计基础分
-  var coinsCny = G.coins * 1;                   // 金币可覆盖的元数
-  var pointsCny = realPoints * 0.2;             // 积分可覆盖的元数
-  var baseCny = baseTotal * 0.1;                // 基础分可覆盖的元数
-  var totalCny = coinsCny + pointsCny + baseCny;
+  var studyTotal = G.studyPoints || 0;
+  var workTotal  = G.workPoints  || 0;
+  var sportTotal = G.sportPoints || 0;
+  var baseTotal  = G.basePoints  || 0;
+  var coinsCny   = G.coins * 1;
+  var studyCny   = studyTotal * 0.2;
+  var workCny    = workTotal  * 0.2;
+  var sportCny   = sportTotal * 0.2;
+  var baseCny    = baseTotal  * 0.1;
+  var totalCny   = coinsCny + studyCny + workCny + sportCny + baseCny;
 
   if (totalCny < needCny) {
     showToast('总资产不足（¥' + totalCny.toFixed(2) + '），需要 ¥' + needCny.toFixed(2));
     return;
   }
 
-  var coinsUsed = 0;
-  var pointsUsed = 0;
-  var baseUsed = 0;
+  var coinsUsed = 0, studyUsed = 0, workUsed = 0, sportUsed = 0, baseUsed = 0;
   var remainCny = needCny;
 
   // 第1级：扣金币
-  if (remainCny <= 0) { /* skip */ }
-  else if (G.coins >= remainCny) {
-    coinsUsed = remainCny;
-    remainCny = 0;
-  } else {
-    coinsUsed = G.coins;
-    remainCny -= coinsUsed;
+  if (remainCny > 0) {
+    if (G.coins >= remainCny) { coinsUsed = remainCny; remainCny = 0; }
+    else { coinsUsed = G.coins; remainCny -= coinsUsed; }
   }
 
-  // 第2级：扣积分（5积分=1元）
-  if (remainCny > 0 && realPoints > 0) {
-    var pointsCoversCny = realPoints * 0.2;
-    if (pointsCoversCny >= remainCny) {
-      pointsUsed = Math.ceil(remainCny / 0.2);
-      remainCny = 0;
-    } else {
-      pointsUsed = realPoints;
-      remainCny -= pointsCoversCny;
-    }
+  // 第2级：扣学分（1学分=0.2元）
+  if (remainCny > 0 && studyTotal > 0) {
+    var sc2 = studyTotal * 0.2;
+    if (sc2 >= remainCny) { studyUsed = Math.ceil(remainCny / 0.2); remainCny = 0; }
+    else { studyUsed = studyTotal; remainCny -= sc2; }
   }
 
-  // 第3级：扣基础分（10基础分=1元）
+  // 第3级：扣工分（1工分=0.2元）
+  if (remainCny > 0 && workTotal > 0) {
+    var wc2 = workTotal * 0.2;
+    if (wc2 >= remainCny) { workUsed = Math.ceil(remainCny / 0.2); remainCny = 0; }
+    else { workUsed = workTotal; remainCny -= wc2; }
+  }
+
+  // 第4级：扣运动分（1运动分=0.2元）
+  if (remainCny > 0 && sportTotal > 0) {
+    var spc2 = sportTotal * 0.2;
+    if (spc2 >= remainCny) { sportUsed = Math.ceil(remainCny / 0.2); remainCny = 0; }
+    else { sportUsed = sportTotal; remainCny -= spc2; }
+  }
+
+  // 第5级：扣基础分（10基础分=1元）
   if (remainCny > 0 && baseTotal > 0) {
     var baseCoversCny = baseTotal * 0.1;
-    if (baseCoversCny >= remainCny) {
-      baseUsed = Math.ceil(remainCny / 0.1);
-      remainCny = 0;
-    } else {
-      baseUsed = baseTotal;
-      remainCny -= baseCoversCny;
-    }
+    if (baseCoversCny >= remainCny) { baseUsed = Math.ceil(remainCny / 0.1); remainCny = 0; }
+    else { baseUsed = baseTotal; remainCny -= baseCoversCny; }
   }
 
   G.coins -= coinsUsed;
-  if (pointsUsed > 0) G.points -= pointsUsed;
-  if (baseUsed > 0) {
-    if (!G.basePoints) G.basePoints = 0;
-    G.basePoints -= baseUsed;
-  }
+  if (studyUsed > 0) G.studyPoints -= studyUsed;
+  if (workUsed  > 0) G.workPoints  -= workUsed;
+  if (sportUsed > 0) G.sportPoints -= sportUsed;
+  if (baseUsed  > 0) G.basePoints  -= baseUsed;
 
   var parts = [];
   if (coinsUsed > 0) parts.push(coinsUsed + '金币');
-  if (pointsUsed > 0) parts.push(pointsUsed + '积分');
-  if (baseUsed > 0) parts.push(baseUsed + '基础分');
+  if (studyUsed > 0) parts.push(studyUsed + '学分');
+  if (workUsed  > 0) parts.push(workUsed  + '工分');
+  if (sportUsed > 0) parts.push(sportUsed + '运动分');
+  if (baseUsed  > 0) parts.push(baseUsed  + '基础分');
   var detail = '扣除 ' + parts.join(' + ');
 
-  G.spends.push({ date: today(), desc, cny, coinsUsed, pointsUsed, baseUsed });
+  G.spends.push({ date: today(), desc, cny, coinsUsed, studyUsed, workUsed, sportUsed, baseUsed });
   document.getElementById('spendDesc').value = '';
   document.getElementById('spendCny').value  = '';
   saveData(G);
@@ -3076,8 +3106,8 @@ function renderStats() {
       </div>
       <div class="divider"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:var(--muted);font-size:13px;">今日积分</span>
-        <span class="score-val total">${rec.total}</span>
+        <span style="color:var(--muted);font-size:13px;">学+工+运动分合计</span>
+        <span class="score-val total">${(rec.earnedStudy||rec.studyScore+rec.studyBonus||0) + (rec.earnedWork||rec.workScore+rec.workBonus||0) + (rec.earnedSport||rec.sportScore+rec.sportBonus||0)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
         <span style="color:var(--muted);font-size:13px;">入睡时间</span>
@@ -3089,7 +3119,7 @@ function renderStats() {
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
         <span style="color:var(--muted);font-size:13px;">等值人民币</span>
-        <span style="color:#ccc;font-weight:600;">¥${(rec.total * 0.2 + rec.base * 0.1 + rec.coinEarned).toFixed(2)}</span>
+        <span style="color:#ccc;font-weight:600;">¥${((rec.earnedStudy||rec.studyScore+rec.studyBonus||0) * 0.2 + (rec.earnedWork||rec.workScore+rec.workBonus||0) * 0.2 + (rec.earnedSport||rec.sportScore+rec.sportBonus||0) * 0.2 + (rec.earnedBase||rec.base||0) * 0.1 + rec.coinEarned).toFixed(2)}</span>
       </div>
     </div>
 
@@ -3204,28 +3234,27 @@ function renderTimeBar(label, val, max, color) {
   `;
 }
 
-// ===== 积分计算（积分=学分+工分+健康分，不含基础分）=====
-function getRealPoints() {
-  // G.points 已不含基础分（积分=学分+工分+健康分）
-  return G.points;
-}
-
 // ===== 钱包 =====
 function renderWallet() {
-  var realPoints = getRealPoints();             // 积分（学+工+健康，不含基础分）
-  var baseTotal = G.basePoints || 0;            // 累计基础分
-  var coinsCny = G.coins * 1;                  // 1金币 = 1元
-  var pointsCny = realPoints * 0.2;            // 1积分 = 0.2元
-  var baseCny = baseTotal * 0.1;               // 1基础分 = 0.1元
-  var totalCny = coinsCny + pointsCny + baseCny; // 总资产
+  var studyTotal = G.studyPoints || 0;
+  var workTotal  = G.workPoints  || 0;
+  var sportTotal = G.sportPoints || 0;
+  var baseTotal  = G.basePoints  || 0;
+  var coinsCny   = G.coins * 1;
+  var studyCny   = studyTotal * 0.2;
+  var workCny    = workTotal  * 0.2;
+  var sportCny   = sportTotal * 0.2;
+  var baseCny    = baseTotal  * 0.1;
+  var totalCny   = coinsCny + studyCny + workCny + sportCny + baseCny;
 
-  document.getElementById('wallet-coins').textContent = G.coins.toFixed(0);
-  document.getElementById('wallet-cny').textContent   = '≈ ¥' + coinsCny.toFixed(2);
-  document.getElementById('wallet-points').textContent = realPoints;
-  document.getElementById('wallet-points-cny').textContent = '≈ ¥' + pointsCny.toFixed(2);
-  document.getElementById('wallet-base').textContent = baseTotal + ' 分（≈ ¥' + baseCny.toFixed(2) + '）';
-  document.getElementById('wallet-coupons').textContent = G.coupons + ' 张';
-  document.getElementById('wallet-total-cny').textContent = '≈ ¥' + totalCny.toFixed(2);
+  document.getElementById('wallet-coins').textContent       = G.coins.toFixed(0);
+  document.getElementById('wallet-cny').textContent         = '≈ ¥' + coinsCny.toFixed(2);
+  document.getElementById('wallet-study').textContent       = studyTotal + ' 分（≈ ¥' + studyCny.toFixed(2) + '）';
+  document.getElementById('wallet-work').textContent        = workTotal  + ' 分（≈ ¥' + workCny.toFixed(2)  + '）';
+  document.getElementById('wallet-sport').textContent       = sportTotal + ' 分（≈ ¥' + sportCny.toFixed(2) + '）';
+  document.getElementById('wallet-base').textContent        = baseTotal  + ' 分（≈ ¥' + baseCny.toFixed(2)  + '）';
+  document.getElementById('wallet-coupons').textContent     = G.coupons + ' 张';
+  document.getElementById('wallet-total-cny').textContent   = '≈ ¥' + totalCny.toFixed(2);
 
   const el = document.getElementById('spendHistory');
   if (G.spends.length === 0) {
@@ -3234,13 +3263,15 @@ function renderWallet() {
   }
   el.innerHTML = [...G.spends].reverse().map(s => {
     var sub = '';
-    if (s.coinsUsed || s.pointsUsed || s.baseUsed) {
-      var parts = [];
-      if (s.coinsUsed) parts.push(s.coinsUsed + '金币');
-      if (s.pointsUsed) parts.push(s.pointsUsed + '积分');
-      if (s.baseUsed) parts.push(s.baseUsed + '基础分');
-      sub = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + parts.join(' + ') + '</div>';
-    }
+    var parts = [];
+    if (s.coinsUsed) parts.push(s.coinsUsed + '金币');
+    if (s.studyUsed) parts.push(s.studyUsed + '学分');
+    if (s.workUsed)  parts.push(s.workUsed  + '工分');
+    if (s.sportUsed) parts.push(s.sportUsed + '运动分');
+    if (s.baseUsed)  parts.push(s.baseUsed  + '基础分');
+    // 兼容旧格式（pointsUsed）
+    if (!s.studyUsed && !s.workUsed && !s.sportUsed && s.pointsUsed) parts.push(s.pointsUsed + '分（旧）');
+    if (parts.length) sub = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + parts.join(' + ') + '</div>';
     return `
     <div class="history-item">
       <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -3530,7 +3561,7 @@ function renderHistory() {
           ${sleepTag}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="history-total">积分 ${r.total}</span>
+          <span class="history-total">学${r.studyScore+r.studyBonus} 工${r.workScore+r.workBonus} 运${r.sportScore+r.sportBonus} 基${r.base}</span>
           <span style="color:var(--gold);font-size:13px;">+${r.coinEarned}金币</span>
         </div>
       </div>`;
@@ -4921,15 +4952,18 @@ function updateManualCheckinPreview() {
   var sc = calcScores(studyM, workM, sportM, phoneM);
   var coins = calcSleepCoins(sleepH, sleepM);
   var titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
-  var totalScore = sc.total;
-  if (titles.dayMaster) { coins = Math.floor(coins * 1.1); totalScore = Math.floor(sc.total * 1.1) + Math.floor(sc.base * 0.1); }
+  var eStudy = sc.studyScore + sc.studyBonus;
+  var eWork  = sc.workScore  + sc.workBonus;
+  var eSport = sc.sportScore + sc.sportBonus;
+  var eBase  = sc.base;
+  if (titles.dayMaster) { coins = Math.floor(coins * 1.1); eStudy = Math.floor(eStudy*1.1); eWork = Math.floor(eWork*1.1); eSport = Math.floor(eSport*1.1); eBase = Math.floor(eBase*1.1); }
   var titleStr = '';
   if (titles.dayMaster) titleStr = ' | 👑一日之主(全项×1.1)';
   else if (titles.quasiMaster) titleStr = ' | ⚔️准一日之主';
   else if (titles.nightWatch) titleStr = ' | 🌙守夜人';
   var preview = document.getElementById('manualCheckinPreview');
   if (preview) {
-    preview.textContent = '预览：基础 ' + sc.base + ' | 学分 ' + sc.studyScore + ' | 工分 ' + sc.workScore + ' | 健康分 ' + sc.sportScore + ' | 积分 ' + totalScore + ' | 金币 +' + coins + titleStr;
+    preview.textContent = '预览：基础 ' + eBase + ' | 学分 ' + eStudy + ' | 工分 ' + eWork + ' | 运动分 ' + eSport + ' | 金币 +' + coins + titleStr;
   }
 }
 
@@ -4955,25 +4989,35 @@ function saveManualCheckin() {
   var sc = calcScores(studyM, workM, sportM, phoneM);
   var coinEarned = calcSleepCoins(sleepH, sleepM);
   var titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
-  var totalScore = sc.total;
+  var earnedStudy = sc.studyScore + sc.studyBonus;
+  var earnedWork  = sc.workScore  + sc.workBonus;
+  var earnedSport = sc.sportScore + sc.sportBonus;
+  var earnedBase  = sc.base;
   if (titles.dayMaster) {
-    coinEarned = Math.floor(coinEarned * 1.1);
-    totalScore = Math.floor(sc.total * 1.1) + Math.floor(sc.base * 0.1);
+    coinEarned  = Math.floor(coinEarned * 1.1);
+    earnedStudy = Math.floor(earnedStudy * 1.1);
+    earnedWork  = Math.floor(earnedWork  * 1.1);
+    earnedSport = Math.floor(earnedSport * 1.1);
+    earnedBase  = Math.floor(earnedBase  * 1.1);
   }
   if (_editingCheckinDate) {
     var idx = G.records.findIndex(function(r) { return r.date === _editingCheckinDate; });
     if (idx === -1) { showToast('原记录不存在'); return; }
     var old = G.records[idx];
     G.coins -= old.coinEarned;
-    G.points -= old.total;
-    G.basePoints -= (old.base || 0);
+    G.studyPoints -= (old.earnedStudy !== undefined ? old.earnedStudy : (old.studyScore + (old.studyBonus||0)));
+    G.workPoints  -= (old.earnedWork  !== undefined ? old.earnedWork  : (old.workScore  + (old.workBonus||0)));
+    G.sportPoints -= (old.earnedSport !== undefined ? old.earnedSport : (old.sportScore + (old.sportBonus||0)));
+    G.basePoints  -= (old.earnedBase  !== undefined ? old.earnedBase  : (old.base||0));
     G.studyBonusPool -= (old.studyBonus || 0);
     G.workBonusPool  -= (old.workBonus || 0);
     G.sportBonusPool -= (old.sportBonus || 0);
-    G.records[idx] = { date: date, studyM: studyM, workM: workM, sportM: sportM, phoneM: phoneM, sleepH: sleepH, sleepM: sleepM, base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus, workScore: sc.workScore, workBonus: sc.workBonus, sportScore: sc.sportScore, sportBonus: sc.sportBonus, total: totalScore, coinEarned: coinEarned, repaired: false, titles: titles };
+    G.records[idx] = { date: date, studyM, workM, sportM, phoneM, sleepH, sleepM, base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus, workScore: sc.workScore, workBonus: sc.workBonus, sportScore: sc.sportScore, sportBonus: sc.sportBonus, earnedStudy, earnedWork, earnedSport, earnedBase, coinEarned, repaired: false, titles };
     G.coins += coinEarned;
-    G.points += totalScore;
-    G.basePoints += sc.base;
+    G.studyPoints += earnedStudy;
+    G.workPoints  += earnedWork;
+    G.sportPoints += earnedSport;
+    G.basePoints  += earnedBase;
     G.studyBonusPool += sc.studyBonus;
     G.workBonusPool  += sc.workBonus;
     G.sportBonusPool += sc.sportBonus;
@@ -4983,10 +5027,12 @@ function saveManualCheckin() {
       showToast('该日期已有打卡记录，请使用编辑功能');
       return;
     }
-    G.records.push({ date: date, studyM: studyM, workM: workM, sportM: sportM, phoneM: phoneM, sleepH: sleepH, sleepM: sleepM, base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus, workScore: sc.workScore, workBonus: sc.workBonus, sportScore: sc.sportScore, sportBonus: sc.sportBonus, total: totalScore, coinEarned: coinEarned, repaired: false, titles: titles });
+    G.records.push({ date, studyM, workM, sportM, phoneM, sleepH, sleepM, base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus, workScore: sc.workScore, workBonus: sc.workBonus, sportScore: sc.sportScore, sportBonus: sc.sportBonus, earnedStudy, earnedWork, earnedSport, earnedBase, coinEarned, repaired: false, titles });
     G.coins += coinEarned;
-    G.points += totalScore;
-    G.basePoints += sc.base;
+    G.studyPoints += earnedStudy;
+    G.workPoints  += earnedWork;
+    G.sportPoints += earnedSport;
+    G.basePoints  += earnedBase;
     G.studyBonusPool += sc.studyBonus;
     G.workBonusPool  += sc.workBonus;
     G.sportBonusPool += sc.sportBonus;
@@ -5003,8 +5049,10 @@ function deleteCheckinRecord(date) {
   if (idx === -1) return;
   var rec = G.records[idx];
   G.coins -= rec.coinEarned;
-  G.points -= rec.total;
-  G.basePoints -= (rec.base || 0);
+  G.studyPoints -= (rec.earnedStudy !== undefined ? rec.earnedStudy : (rec.studyScore + (rec.studyBonus||0)));
+  G.workPoints  -= (rec.earnedWork  !== undefined ? rec.earnedWork  : (rec.workScore  + (rec.workBonus||0)));
+  G.sportPoints -= (rec.earnedSport !== undefined ? rec.earnedSport : (rec.sportScore + (rec.sportBonus||0)));
+  G.basePoints  -= (rec.earnedBase  !== undefined ? rec.earnedBase  : (rec.base||0));
   G.studyBonusPool -= (rec.studyBonus || 0);
   G.workBonusPool  -= (rec.workBonus || 0);
   G.sportBonusPool -= (rec.sportBonus || 0);
@@ -5355,7 +5403,7 @@ function renderLegend(segments) {
     var dur = seg.endMin - seg.startMin;
     var editable = seg.type === 'unknown' || seg.source === 'manual';
     var onclick = editable ? ' onclick="handleLegendClick(\'' + seg.id + '\',\'' + seg.type + '\',' + seg.startMin + ',' + seg.endMin + ',\'' + (seg.label||'').replace(/'/g,"\\'") + '\',\'' + (seg.note||'').replace(/'/g,"\\'") + '\')"' : '';
-    // 积分标注：浪费=0分，娱乐/日常/睡眠=1分/分钟，学习/工作/运动=2分/分钟
+    // ===== 积分标注：浪费=0分，娱乐/日常/睡眠不计入专项分，学习/工作/运动=各1分/分钟
     var scoreLabel = '';
     if (seg.type === 'waste') {
       scoreLabel = '<span class="legend-score zero">0分</span>';
