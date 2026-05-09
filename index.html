@@ -2437,6 +2437,28 @@ if (G.points !== undefined) {
   delete G.points;
   saveData(G);
 }
+// 确保新字段存在（无论是否从 G.points 迁移）
+if (G.studyPoints === undefined || G.studyPoints === null) {
+  G.studyPoints = 0;
+  for (var _si = 0; _si < G.records.length; _si++) {
+    G.studyPoints += (G.records[_si].studyScore || 0) + (G.records[_si].studyBonus || 0);
+  }
+  saveData(G);
+}
+if (G.workPoints === undefined || G.workPoints === null) {
+  G.workPoints = 0;
+  for (var _wi = 0; _wi < G.records.length; _wi++) {
+    G.workPoints += (G.records[_wi].workScore || 0) + (G.records[_wi].workBonus || 0);
+  }
+  saveData(G);
+}
+if (G.sportPoints === undefined || G.sportPoints === null) {
+  G.sportPoints = 0;
+  for (var _spi = 0; _spi < G.records.length; _spi++) {
+    G.sportPoints += (G.records[_spi].sportScore || 0) + (G.records[_spi].sportBonus || 0);
+  }
+  saveData(G);
+}
 // 旧版 G.basePoints 缺失迁移
 if (!G.basePoints && G.basePoints !== 0) {
   var _migrateBase = 0;
@@ -2446,6 +2468,15 @@ if (!G.basePoints && G.basePoints !== 0) {
   G.basePoints = _migrateBase;
   saveData(G);
 }
+// 确保 coins 是数字
+if (typeof G.coins !== 'number') { G.coins = 0; saveData(G); }
+// 确保其他必要字段存在
+if (!G.spends) { G.spends = []; saveData(G); }
+if (!G.repairedDays) { G.repairedDays = []; saveData(G); }
+if (!G.records) { G.records = []; saveData(G); }
+if (!G.studyBonusPool) { G.studyBonusPool = 0; saveData(G); }
+if (!G.workBonusPool) { G.workBonusPool = 0; saveData(G); }
+if (!G.sportBonusPool) { G.sportBonusPool = 0; saveData(G); }
 
 // ========== 日期工具 ==========
 function today() {
@@ -3240,14 +3271,15 @@ function renderWallet() {
   var workTotal  = G.workPoints  || 0;
   var sportTotal = G.sportPoints || 0;
   var baseTotal  = G.basePoints  || 0;
-  var coinsCny   = G.coins * 1;
+  var coins      = G.coins || 0;
+  var coinsCny   = coins * 1;
   var studyCny   = studyTotal * 0.2;
   var workCny    = workTotal  * 0.2;
   var sportCny   = sportTotal * 0.2;
   var baseCny    = baseTotal  * 0.1;
   var totalCny   = coinsCny + studyCny + workCny + sportCny + baseCny;
 
-  document.getElementById('wallet-coins').textContent       = G.coins.toFixed(0);
+  document.getElementById('wallet-coins').textContent       = coins.toFixed(0);
   document.getElementById('wallet-cny').textContent         = '≈ ¥' + coinsCny.toFixed(2);
   document.getElementById('wallet-study').textContent       = studyTotal + ' 分（≈ ¥' + studyCny.toFixed(2) + '）';
   document.getElementById('wallet-work').textContent        = workTotal  + ' 分（≈ ¥' + workCny.toFixed(2)  + '）';
