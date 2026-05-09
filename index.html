@@ -1383,18 +1383,6 @@
 <!-- ============================== -->
 <div class="page active" id="page-checkin">
 
-  <div class="card">
-    <div class="card-title"><span class="icon">⏰</span>昨晚入睡时间</div>
-    <div class="time-picker">
-      <select id="sleepHour"></select>
-      <span class="time-sep">:</span>
-      <select id="sleepMinute"></select>
-    </div>
-    <div style="margin-top:10px; font-size:12px; color:var(--muted);">
-      20:30~22:30 <span style="color:var(--gold)">+10金币</span>  ·  22:30~23:00 <span style="color:var(--gold)">+8金币</span>  ·  23:00~23:30 <span style="color:var(--gold)">+6金币</span>
-    </div>
-  </div>
-
   <div class="card" id="sleepDurationCard">
     <div class="card-title"><span class="icon">🌙</span>今日睡眠时间</div>
     <div id="sleepDurationContent" style="font-size:14px; color:var(--muted);">加载中…</div>
@@ -2190,16 +2178,6 @@
       </div>
     </div>
 
-    <div class="manual-section">
-      <div class="manual-section-title">🌙 入睡时间</div>
-      <div class="manual-time-row">
-        <input type="number" id="manualSleepH" min="0" max="24" placeholder="0" inputmode="numeric">
-        <span class="time-unit">时</span>
-        <input type="number" id="manualSleepM" min="0" max="59" placeholder="0" inputmode="numeric">
-        <span class="time-unit">分</span>
-      </div>
-    </div>
-
     <div id="manualCheckinPreview" style="margin:12px 0;padding:10px;background:var(--card2);border-radius:8px;font-size:12px;color:var(--teal);min-height:20px;text-align:center;"></div>
 
     <div class="manual-btn-row">
@@ -2566,23 +2544,7 @@ function displayToday() {
 }
 
 // ========== 初始化时间选择器 ==========
-function initTimePicker() {
-  const hSel = document.getElementById('sleepHour');
-  const mSel = document.getElementById('sleepMinute');
-  for (let h = 18; h <= 24; h++) {
-    const o = document.createElement('option');
-    o.value = h % 24;
-    o.textContent = String(h % 24).padStart(2,'0');
-    if (h === 23) o.selected = true;
-    hSel.appendChild(o);
-  }
-  for (let m = 0; m < 60; m += 1) {
-    const o = document.createElement('option');
-    o.value = m;
-    o.textContent = String(m).padStart(2,'0');
-    mSel.appendChild(o);
-  }
-}
+// 入睡时间已从打卡页移除，由 sleep_log 自动获取
 
 // ========== 各分计算核心 ==========
 // wasteM: 浪费(0分)；funM/dailyM: 得基础分1分/分钟；study/work/sport: 2分/分钟
@@ -2612,6 +2574,26 @@ function calcSleepCoins(h, m) {
   if (t <= 23*60) return 8;
   if (t <= 23*60+30) return 6;
   return 0;                         // 晚于23:30无奖励
+}
+
+// 从睡眠记录获取今日入睡时间（优先 sleep_log，其次已存打卡记录）
+function getTodaySleepTime() {
+  return getSleepTimeForDate(today());
+}
+
+// 从睡眠记录获取指定日期入睡时间
+function getSleepTimeForDate(dateStr) {
+  var logs = loadSleepLog();
+  var dateLogs = logs.filter(function(l) { return l.date === dateStr; });
+  if (dateLogs.length > 0) {
+    var latest = dateLogs[dateLogs.length - 1];
+    return { h: latest.sleepH, m: latest.sleepM };
+  }
+  var rec = G.records.find(function(r) { return r.date === dateStr; });
+  if (rec && rec.sleepH != null) {
+    return { h: rec.sleepH, m: rec.sleepM || 0 };
+  }
+  return { h: 23, m: 0 };
 }
 
 // ========== 每日称号计算 ==========
@@ -2730,8 +2712,9 @@ function updatePreview() {
   const wasteM = parseInt(document.getElementById('phoneMin').value) || 0;
   const funM   = parseInt(document.getElementById('funMin').value) || 0;
   const dailyM = parseInt(document.getElementById('dailyMin').value) || 0;
-  const sleepH = parseInt(document.getElementById('sleepHour').value) || 23;
-  const sleepM = parseInt(document.getElementById('sleepMinute').value) || 0;
+  const st = getTodaySleepTime();
+  const sleepH = st.h;
+  const sleepM = st.m;
 
   const sc = calcScores(studyM, workM, sportM, wasteM, funM, dailyM);
   const coins = calcSleepCoins(sleepH, sleepM);
@@ -2834,8 +2817,9 @@ function saveCheckin() {
   const wasteM = parseInt(document.getElementById('phoneMin').value) || 0;
   const funM   = parseInt(document.getElementById('funMin').value) || 0;
   const dailyM = parseInt(document.getElementById('dailyMin').value) || 0;
-  const sleepH = parseInt(document.getElementById('sleepHour').value) || 23;
-  const sleepM = parseInt(document.getElementById('sleepMinute').value) || 0;
+  const st = getTodaySleepTime();
+  const sleepH = st.h;
+  const sleepM = st.m;
 
   const date = today();
   const existed = G.records.find(r => r.date === date);
@@ -4030,15 +4014,7 @@ function syncFromSchedule() {
     // sleep：从日程睡眠时段提取入睡时间
   });
 
-  // 从日程睡眠时段同步入睡时间
-  var sleepSegs = segs.filter(function(seg) { return seg.type === 'sleep'; });
-  if (sleepSegs.length > 0) {
-    var firstSleep = sleepSegs[0];
-    var bedHour = Math.floor(firstSleep.startMin / 60) % 24;
-    var bedMin  = firstSleep.startMin % 60;
-    document.getElementById('sleepHour').value   = bedHour;
-    document.getElementById('sleepMinute').value = bedMin;
-  }
+  // 从日程睡眠时段同步入睡时间（已自动从sleep_log获取，此处仅同步其他时段数据）
 
   document.getElementById('studyMin').value = studyM;
   document.getElementById('workMin').value = workM;
@@ -4525,11 +4501,8 @@ function syncSleepToCheckin() {
     return;
   }
 
-  // 同步最新一条的入睡时间到打卡页
+  // 入睡时间已自动从 sleep_log 获取，只需刷新预览
   const latestLog = todayLogs[todayLogs.length - 1];
-  document.getElementById('sleepHour').value = latestLog.sleepH;
-  document.getElementById('sleepMinute').value = latestLog.sleepM;
-
   updatePreview();
   refreshSleepDuration();
   switchTab('checkin');
@@ -4569,13 +4542,12 @@ function renderSleepHistory() {
 }
 
 // ========== 绑定输入事件 ==========
-['studyMin','workMin','sportMin','phoneMin','funMin','dailyMin','sleepHour','sleepMinute'].forEach(id => {
+['studyMin','workMin','sportMin','phoneMin','funMin','dailyMin'].forEach(id => {
   document.getElementById(id).addEventListener('input', updatePreview);
   document.getElementById(id).addEventListener('change', updatePreview);
 });
 
 // ========== 启动 ==========
-initTimePicker();
 initCalendar();
 displayToday();
 
@@ -4590,8 +4562,6 @@ displayToday();
     document.getElementById('phoneMin').value = (rec.wasteM ?? rec.phoneM) || 0;
     document.getElementById('funMin').value = rec.funM || 0;
     document.getElementById('dailyMin').value = rec.dailyM || 0;
-    document.getElementById('sleepHour').value = rec.sleepH != null ? rec.sleepH : 23;
-    document.getElementById('sleepMinute').value = rec.sleepM || 0;
   } else if (timerAccum.date === today()) {
     // 未打卡时从计时器数据回填
     document.getElementById('studyMin').value = timerAccum.study || 0;
@@ -5056,8 +5026,6 @@ function openManualCheckinModal(dateStr) {
       document.getElementById('manualWork').value = rec.workM;
       document.getElementById('manualSport').value = rec.sportM;
       document.getElementById('manualPhone').value = rec.phoneM;
-      document.getElementById('manualSleepH').value = rec.sleepH;
-      document.getElementById('manualSleepM').value = rec.sleepM;
     }
   } else {
     dateInput.value = today();
@@ -5068,26 +5036,15 @@ function openManualCheckinModal(dateStr) {
     document.getElementById('manualWork').value = '';
     document.getElementById('manualSport').value = '';
     document.getElementById('manualPhone').value = '';
-    document.getElementById('manualSleepH').value = '23';
-    document.getElementById('manualSleepM').value = '0';
   }
   updateManualCheckinPreview();
   overlay.style.display = 'flex';
-  ['manualStudy','manualWork','manualSport','manualPhone','manualSleepH','manualSleepM'].forEach(function(id) {
+  ['manualStudy','manualWork','manualSport','manualPhone'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
       el.removeEventListener('input', updateManualCheckinPreview);
       el.addEventListener('input', updateManualCheckinPreview);
     }
-  });
-  // 时间输入校验
-  ['manualSleepH'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) { el.removeEventListener('blur', function(){ clampTimeInput(id,0,24); }); el.addEventListener('blur', function(){ clampTimeInput(id,0,24); }); }
-  });
-  ['manualSleepM'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) { el.removeEventListener('blur', function(){ clampTimeInput(id,0,59); }); el.addEventListener('blur', function(){ clampTimeInput(id,0,59); }); }
   });
 }
 
@@ -5096,8 +5053,10 @@ function updateManualCheckinPreview() {
   var workM  = parseInt(document.getElementById('manualWork').value)  || 0;
   var sportM = parseInt(document.getElementById('manualSport').value) || 0;
   var phoneM = parseInt(document.getElementById('manualPhone').value) || 0;
-  var sleepH = parseInt(document.getElementById('manualSleepH').value) || 23;
-  var sleepM = parseInt(document.getElementById('manualSleepM').value) || 0;
+  // 入睡时间从 sleep_log 或已有记录获取
+  var dateStr = document.getElementById('manualCheckinDate').value || today();
+  var st = getSleepTimeForDate(dateStr);
+  var sleepH = st.h, sleepM = st.m;
   var sc = calcScores(studyM, workM, sportM, phoneM);
   var coins = calcSleepCoins(sleepH, sleepM);
   var titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
@@ -5125,16 +5084,13 @@ function saveManualCheckin() {
   var dateInput = document.getElementById('manualCheckinDate');
   var date = dateInput.value;
   if (!date) { showToast('请选择日期'); return; }
-  // 校验时间范围
-  clampTimeInput('manualSleepH', 0, 24);
-  clampTimeInput('manualSleepM', 0, 59);
   var studyM = parseInt(document.getElementById('manualStudy').value) || 0;
   var workM  = parseInt(document.getElementById('manualWork').value)  || 0;
   var sportM = parseInt(document.getElementById('manualSport').value) || 0;
   var phoneM = parseInt(document.getElementById('manualPhone').value) || 0;
-  var sleepH = parseInt(document.getElementById('manualSleepH').value);
-  var sleepM = parseInt(document.getElementById('manualSleepM').value);
-  if (isNaN(sleepH) || isNaN(sleepM)) { showToast('请填写完整的入睡时间'); return; }
+  // 入睡时间从 sleep_log 或已有记录获取
+  var st = getSleepTimeForDate(date);
+  var sleepH = st.h, sleepM = st.m;
   var sc = calcScores(studyM, workM, sportM, phoneM);
   var coinEarned = calcSleepCoins(sleepH, sleepM);
   var titles = calcDailyTitles(studyM, workM, sportM, sleepH, sleepM);
@@ -5664,15 +5620,7 @@ function _autoSyncToCheckin(segs) {
     else if (seg.type === 'fun') funM += dur;
     else if (seg.type === 'daily') dailyM += dur;
   });
-  // 从日程睡眠时段同步入睡时间
-  var sleepSegs = segs.filter(function(seg) { return seg.type === 'sleep'; });
-  if (sleepSegs.length > 0) {
-    var firstSleep = sleepSegs[0];
-    var bedHour = Math.floor(firstSleep.startMin / 60) % 24;
-    var bedMin  = firstSleep.startMin % 60;
-    document.getElementById('sleepHour').value   = bedHour;
-    document.getElementById('sleepMinute').value = bedMin;
-  }
+  // 入睡时间已从sleep_log自动获取，此处仅同步其他时段数据
   document.getElementById('studyMin').value = studyM;
   document.getElementById('workMin').value = workM;
   document.getElementById('sportMin').value = sportM;
