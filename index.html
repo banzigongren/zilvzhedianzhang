@@ -2495,10 +2495,26 @@ const SYNC_GIST_KEY  = 'codex_sync_gist_id';
 const SYNC_DATA_KEYS = ['codex_data_v2','codex_timer_v1','codex_timer_log_v1','codex_sleep_v1','codex_sleep_log_v1','codex_schedule_v1','codex_quotes_v1'];
 
 function loadData() {
+  var data;
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
-  } catch(e) {}
+    if (raw) {
+      data = JSON.parse(raw);
+      // 数据清洗：移除 records 中的 null/undefined 元素
+      if (data && data.records) {
+        data.records = data.records.filter(function(r) { return r && r.date; });
+      }
+      if (data && data.repairedDays) {
+        data.repairedDays = data.repairedDays.filter(function(d) { return d; });
+      }
+      if (data && data.spends) {
+        data.spends = data.spends.filter(function(s) { return s; });
+      }
+      return data;
+    }
+  } catch(e) {
+    console.error('loadData 解析错误:', e);
+  }
   return {
     records: [],       // 每日记录
     coins: 0,          // 金币
@@ -4195,8 +4211,9 @@ function renderHistory() {
     }
 
     // === 有打卡记录（劳动打卡已完成）===
-    const r = rec;
-    const t = (r.sleepH || 0) * 60 + (r.sleepM || 0);
+    var r = rec;
+    if (!r) { return '<div style="color:#f5a623;padding:8px;font-size:12px;">⚠️ ' + dateStr + ' 记录为空</div>'; }
+    var t = ((r.sleepH || 0)) * 60 + (r.sleepM || 0);
     const sleepTag = t <= 22*60+30 ? '<span class="badge badge-gold">22:30前</span>'
                    : t <= 23*60    ? '<span class="badge badge-blue">23:00前</span>'
                    : t <= 23*60+30 ? '<span class="badge badge-purple">23:30前</span>'
@@ -4245,7 +4262,8 @@ function renderHistory() {
       </div>`;
     } catch(itemErr) {
       console.error('renderHistory item error:', dateStr, itemErr);
-      return '<div style="color:#fc5c65;padding:8px;font-size:12px;">⚠️ ' + dateStr + ' 渲染失败: ' + (itemErr.message||'') + '</div>';
+      var stackLine = (itemErr.stack || '').split('\n')[0] || '';
+      return '<div style="color:#fc5c65;padding:8px;font-size:12px;background:rgba(233,69,96,0.1);margin:4px 0;border-radius:6px;">⚠️ ' + dateStr + ' 渲染失败: ' + (itemErr.message||'') + '<br><span style="font-size:10px;color:#aaa;">' + stackLine + '</span></div>';
     }
   }).join('');
 }
