@@ -871,8 +871,11 @@
     .manual-modal-overlay {
       position: fixed; inset: 0; z-index: 99995;
       background: rgba(0,0,0,0.75);
-      display: flex; align-items: center; justify-content: center;
+      display: none;
       padding: 16px;
+    }
+    .manual-modal-overlay.show {
+      display: flex !important; align-items: center; justify-content: center;
     }
     .manual-modal {
       background: #1a1a2e; border: 1px solid rgba(245,166,35,0.3);
@@ -2486,7 +2489,7 @@
 <!-- ============================== -->
 <!-- EDIT SPEND MODAL                -->
 <!-- ============================== -->
-<div class="manual-modal-overlay" id="editSpendOverlay" style="display:none;">
+<div class="manual-modal-overlay" id="editSpendOverlay">
   <div class="manual-modal">
     <button class="close-btn" onclick="closeEditSpendModal()">✕</button>
     <h2>✏️ 编辑消费记录</h2>
@@ -2549,7 +2552,7 @@
 <!-- ============================== -->
 <!-- EDIT TIMER RECORD MODAL         -->
 <!-- ============================== -->
-<div class="manual-modal-overlay" id="editTimerOverlay" style="display:none;">
+<div class="manual-modal-overlay" id="editTimerOverlay">
   <div class="manual-modal">
     <button class="close-btn" onclick="closeEditTimerModal()">✕</button>
     <h2>✏️ 编辑计时记录</h2>
@@ -3708,11 +3711,11 @@ function openEditSpendModal(idx) {
   document.getElementById('editSpendSport').value = s.sportUsed || 0;
   document.getElementById('editSpendBase').value = s.baseUsed || 0;
   updateEditSpendPreview();
-  document.getElementById('editSpendOverlay').style.display = 'flex';
+  document.getElementById('editSpendOverlay').classList.add('show');
 }
 
 function closeEditSpendModal() {
-  document.getElementById('editSpendOverlay').style.display = 'none';
+  document.getElementById('editSpendOverlay').classList.remove('show');
   _editingSpendIdx = -1;
 }
 
@@ -3825,13 +3828,15 @@ function openEditTimerModal(idx) {
   document.getElementById('editTimerMins').value = l.mins || 0;
   document.getElementById('editTimerTag').value = l.tag || '';
   document.getElementById('editTimerNote').value = l.note || '';
-  document.getElementById('editTimerOverlay').style.display = 'flex';
+  document.getElementById('editTimerOverlay').classList.add('show');
 }
+window.openEditTimerModal = openEditTimerModal;
 
 function closeEditTimerModal() {
-  document.getElementById('editTimerOverlay').style.display = 'none';
+  document.getElementById('editTimerOverlay').classList.remove('show');
   _editingTimerIdx = -1;
 }
+window.closeEditTimerModal = closeEditTimerModal;
 
 function saveEditTimer() {
   if (_editingTimerIdx < 0) return;
@@ -4894,7 +4899,7 @@ function renderTimerLog() {
     const tagHtml = l.tag ? '<span class="timer-log-tag">' + l.tag + '</span>' : '';
     const noteHtml = l.note ? '<div class="timer-log-note">📝 ' + l.note + '</div>' : '';
     return `
-      <div class="timer-log-item" style="cursor:pointer;" onclick="openEditTimerModal(${realIdx})">
+      <div class="timer-log-item" data-idx="${realIdx}" ontouchstart="" style="cursor:pointer;-webkit-tap-highlight-color:transparent;">
         <div style="display:flex;align-items:center;flex:1;gap:4px;flex-wrap:wrap;">
           <span class="timer-log-type" style="color:${cfg.color}">${cfg.icon} ${l.mode === 'study' ? '学习' : l.mode === 'work' ? '工作' : '运动'}</span>
           ${tagHtml}
@@ -4907,6 +4912,19 @@ function renderTimerLog() {
         ${noteHtml ? '<div style="width:100%">' + noteHtml + '</div>' : ''}
       </div>`;
   }).join('');
+
+  // 事件委托：点击计时记录打开编辑
+  el.onclick = function(e) {
+    var item = e.target.closest('.timer-log-item');
+    if (!item) return;
+    var idx = parseInt(item.dataset.idx);
+    if (isNaN(idx)) return;
+    if (typeof window.openEditTimerModal === 'function') {
+      window.openEditTimerModal(idx);
+    } else {
+      openEditTimerModal(idx);
+    }
+  };
 }
 
 function clearTimerLog() {
@@ -7545,6 +7563,16 @@ function escapeHtml(str) {
   div.appendChild(document.createTextNode(str));
   return div.innerHTML;
 }
+
+// 显式暴露函数到全局作用域（确保手机端可访问）
+window.openEditTimerModal = openEditTimerModal;
+window.closeEditTimerModal = closeEditTimerModal;
+window.saveEditTimer = saveEditTimer;
+window.deleteTimerRecord = deleteTimerRecord;
+window.openEditSpendModal = openEditSpendModal;
+window.closeEditSpendModal = closeEditSpendModal;
+window.saveEditSpend = saveEditSpend;
+window.deleteSpend = deleteSpend;
 </script>
 </body>
 <!-- v 2026-05-11 17:10:44 -->
