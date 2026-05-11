@@ -2484,6 +2484,69 @@
 </div>
 
 <!-- ============================== -->
+<!-- EDIT SPEND MODAL                -->
+<!-- ============================== -->
+<div class="manual-modal-overlay" id="editSpendOverlay" style="display:none;">
+  <div class="manual-modal">
+    <button class="close-btn" onclick="closeEditSpendModal()">✕</button>
+    <h2>✏️ 编辑消费记录</h2>
+
+    <div class="manual-section">
+      <div class="manual-section-title">📋 基本信息</div>
+      <div class="manual-row">
+        <label>说明</label>
+        <input type="text" id="editSpendDesc" placeholder="消费说明" style="flex:1;" oninput="updateEditSpendPreview()">
+      </div>
+      <div class="manual-row">
+        <label>金额</label>
+        <input type="number" id="editSpendCny" min="0" step="0.01" placeholder="0.00" inputmode="decimal" oninput="updateEditSpendPreview()">
+        <span class="unit">元</span>
+      </div>
+      <div class="manual-date-row" style="margin-top:8px;">
+        <label>日期</label>
+        <input type="date" id="editSpendDate" onchange="updateEditSpendPreview()">
+      </div>
+    </div>
+
+    <div class="manual-section">
+      <div class="manual-section-title">💰 扣减明细</div>
+      <div class="manual-row">
+        <label style="color:var(--gold);">金币</label>
+        <input type="number" id="editSpendCoins" min="0" placeholder="0" inputmode="numeric" oninput="updateEditSpendPreview()">
+        <span class="unit">个</span>
+      </div>
+      <div class="manual-row">
+        <label style="color:#a29bfe;">学分</label>
+        <input type="number" id="editSpendStudy" min="0" placeholder="0" inputmode="numeric" oninput="updateEditSpendPreview()">
+        <span class="unit">分</span>
+      </div>
+      <div class="manual-row">
+        <label style="color:#55efc4;">工分</label>
+        <input type="number" id="editSpendWork" min="0" placeholder="0" inputmode="numeric" oninput="updateEditSpendPreview()">
+        <span class="unit">分</span>
+      </div>
+      <div class="manual-row">
+        <label style="color:var(--accent);">运动分</label>
+        <input type="number" id="editSpendSport" min="0" placeholder="0" inputmode="numeric" oninput="updateEditSpendPreview()">
+        <span class="unit">分</span>
+      </div>
+      <div class="manual-row">
+        <label style="color:var(--muted);">基础分</label>
+        <input type="number" id="editSpendBase" min="0" placeholder="0" inputmode="numeric" oninput="updateEditSpendPreview()">
+        <span class="unit">分</span>
+      </div>
+    </div>
+
+    <div id="editSpendPreview" style="margin:12px 0;padding:10px;background:var(--card2);border-radius:8px;font-size:12px;color:var(--muted);text-align:center;min-height:20px;border:1px solid var(--border);"></div>
+
+    <div class="manual-btn-row">
+      <button class="btn btn-sm" style="background:rgba(233,69,96,0.2);color:#e94560;flex:1;" onclick="deleteSpend()">🗑️ 删除</button>
+      <button class="btn btn-gold btn-sm" style="flex:1;" onclick="saveEditSpend()">💾 保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
 <!-- JAVASCRIPT                      -->
 <!-- ============================== -->
 <script>
@@ -3581,6 +3644,126 @@ function spendMoney() {
   showToast('💸 消费 ¥' + cny.toFixed(2) + '，' + detail);
 }
 
+// ========== 编辑消费记录 ==========
+var _editingSpendIdx = -1;
+
+function openEditSpendModal(idx) {
+  var s = G.spends[idx];
+  if (!s) return;
+  _editingSpendIdx = idx;
+  document.getElementById('editSpendDesc').value = s.desc || '';
+  document.getElementById('editSpendCny').value = s.cny || 0;
+  document.getElementById('editSpendDate').value = s.date || today();
+  document.getElementById('editSpendCoins').value = s.coinsUsed || 0;
+  document.getElementById('editSpendStudy').value = s.studyUsed || 0;
+  document.getElementById('editSpendWork').value = s.workUsed || 0;
+  document.getElementById('editSpendSport').value = s.sportUsed || 0;
+  document.getElementById('editSpendBase').value = s.baseUsed || 0;
+  updateEditSpendPreview();
+  document.getElementById('editSpendOverlay').style.display = 'flex';
+}
+
+function closeEditSpendModal() {
+  document.getElementById('editSpendOverlay').style.display = 'none';
+  _editingSpendIdx = -1;
+}
+
+function updateEditSpendPreview() {
+  var desc = document.getElementById('editSpendDesc').value.trim() || '(无说明)';
+  var cny = parseFloat(document.getElementById('editSpendCny').value) || 0;
+  var coins = parseInt(document.getElementById('editSpendCoins').value) || 0;
+  var study = parseInt(document.getElementById('editSpendStudy').value) || 0;
+  var work = parseInt(document.getElementById('editSpendWork').value) || 0;
+  var sport = parseInt(document.getElementById('editSpendSport').value) || 0;
+  var base = parseInt(document.getElementById('editSpendBase').value) || 0;
+  var eqCny = coins * 1 + study * 0.2 + work * 0.2 + sport * 0.2 + base * 0.1;
+  var date = document.getElementById('editSpendDate').value || '--';
+  var el = document.getElementById('editSpendPreview');
+  if (Math.abs(eqCny - cny) > 0.01) {
+    el.innerHTML = '<span style="color:#e94560;">⚠️ 扣减合计 ¥' + eqCny.toFixed(2) + ' 与消费金额 ¥' + cny.toFixed(2) + ' 不一致</span>';
+  } else {
+    el.innerHTML = desc + '　¥' + cny.toFixed(2) + '　' + date;
+  }
+}
+
+function saveEditSpend() {
+  if (_editingSpendIdx < 0 || _editingSpendIdx >= G.spends.length) return;
+  var oldSpend = G.spends[_editingSpendIdx];
+  var desc = document.getElementById('editSpendDesc').value.trim();
+  var cny = parseFloat(document.getElementById('editSpendCny').value) || 0;
+  var date = document.getElementById('editSpendDate').value;
+  var coinsUsed = parseInt(document.getElementById('editSpendCoins').value) || 0;
+  var studyUsed = parseInt(document.getElementById('editSpendStudy').value) || 0;
+  var workUsed = parseInt(document.getElementById('editSpendWork').value) || 0;
+  var sportUsed = parseInt(document.getElementById('editSpendSport').value) || 0;
+  var baseUsed = parseInt(document.getElementById('editSpendBase').value) || 0;
+
+  if (!desc) { showToast('请填写消费说明'); return; }
+  if (cny <= 0) { showToast('消费金额无效'); return; }
+
+  // 先退回旧扣减
+  G.coins = (G.coins || 0) + (oldSpend.coinsUsed || 0);
+  G.studyPoints = (G.studyPoints || 0) + (oldSpend.studyUsed || 0);
+  G.workPoints = (G.workPoints || 0) + (oldSpend.workUsed || 0);
+  G.sportPoints = (G.sportPoints || 0) + (oldSpend.sportUsed || 0);
+  G.basePoints = (G.basePoints || 0) + (oldSpend.baseUsed || 0);
+
+  // 检查新扣减是否够
+  if (G.coins < coinsUsed || G.studyPoints < studyUsed || G.workPoints < workUsed || G.sportPoints < sportUsed || G.basePoints < baseUsed) {
+    // 余额不足，恢复旧扣减
+    G.coins -= (oldSpend.coinsUsed || 0);
+    G.studyPoints -= (oldSpend.studyUsed || 0);
+    G.workPoints -= (oldSpend.workUsed || 0);
+    G.sportPoints -= (oldSpend.sportUsed || 0);
+    G.basePoints -= (oldSpend.baseUsed || 0);
+    showToast('余额不足，无法按新扣减保存');
+    return;
+  }
+
+  // 扣减新值
+  G.coins -= coinsUsed;
+  G.studyPoints -= studyUsed;
+  G.workPoints -= workUsed;
+  G.sportPoints -= sportUsed;
+  G.basePoints -= baseUsed;
+
+  // 更新记录
+  G.spends[_editingSpendIdx] = {
+    date: date || today(),
+    desc: desc,
+    cny: cny,
+    coinsUsed: coinsUsed,
+    studyUsed: studyUsed,
+    workUsed: workUsed,
+    sportUsed: sportUsed,
+    baseUsed: baseUsed
+  };
+
+  saveData(G);
+  closeEditSpendModal();
+  renderAll();
+  showToast('✅ 消费记录已更新');
+}
+
+function deleteSpend() {
+  if (_editingSpendIdx < 0 || _editingSpendIdx >= G.spends.length) return;
+  var s = G.spends[_editingSpendIdx];
+  if (!confirm('确定删除消费记录「' + (s.desc || '') + '」？\n删除后将退回已扣减的货币。')) return;
+
+  // 退回扣减
+  G.coins = (G.coins || 0) + (s.coinsUsed || 0);
+  G.studyPoints = (G.studyPoints || 0) + (s.studyUsed || 0);
+  G.workPoints = (G.workPoints || 0) + (s.workUsed || 0);
+  G.sportPoints = (G.sportPoints || 0) + (s.sportUsed || 0);
+  G.basePoints = (G.basePoints || 0) + (s.baseUsed || 0);
+
+  G.spends.splice(_editingSpendIdx, 1);
+  saveData(G);
+  closeEditSpendModal();
+  renderAll();
+  showToast('🗑️ 消费记录已删除，货币已退回');
+}
+
 // ========== 渲染全部 ==========
 function renderAll() {
   renderStats();
@@ -3834,22 +4017,25 @@ function renderWallet() {
     el.innerHTML = '<div class="empty" style="padding:20px;">暂无消费记录</div>';
     return;
   }
-  el.innerHTML = [...G.spends].reverse().map(s => {
-    var sub = '';
+  el.innerHTML = [...G.spends].reverse().map((s, ri) => {
+    var realIdx = G.spends.length - 1 - ri;
     var parts = [];
     if (s.coinsUsed) parts.push(s.coinsUsed + '金币');
+    if (s.studyUsed) parts.push(s.studyUsed + '学分');
+    if (s.workUsed)  parts.push(s.workUsed  + '工分');
+    if (s.sportUsed) parts.push(s.sportUsed + '运动分');
     if (s.baseUsed)  parts.push(s.baseUsed  + '基础分');
     // 兼容旧格式（pointsUsed）
-    if (!s.coinsUsed && !s.baseUsed && s.pointsUsed) parts.push(s.pointsUsed + '分（旧）');
-    if (parts.length) sub = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + parts.join(' + ') + '</div>';
+    if (!s.coinsUsed && !s.studyUsed && !s.workUsed && !s.sportUsed && !s.baseUsed && s.pointsUsed) parts.push(s.pointsUsed + '分（旧）');
+    var sub = parts.length ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">扣除：' + parts.join(' + ') + '</div>' : '';
     return `
-    <div class="history-item">
+    <div class="history-item" style="cursor:pointer;" onclick="openEditSpendModal(${realIdx})">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:14px;">${s.desc}</span>
         <span style="color:var(--accent);font-weight:700;">-¥${s.cny.toFixed(2)}</span>
       </div>
       ${sub}
-      <div class="history-date">${s.date}</div>
+      <div class="history-date">${s.date}　<span style="color:var(--gold);font-size:10px;">✏️ 点击编辑</span></div>
     </div>
   `;
   }).join('');
