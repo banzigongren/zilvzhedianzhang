@@ -4046,16 +4046,80 @@ function renderHistory() {
   renderCalendar(); // 渲染月历
   const el = document.getElementById('historyList');
   const header = document.getElementById('historyHeader');
-  if (G.records.length === 0 && G.repairedDays.length === 0) {
+
+  // 收集所有有日程的日期
+  const schedules = loadScheduleData();
+  const scheduleDates = new Set();
+  (schedules || []).forEach(function(s) { if (s.date) scheduleDates.add(s.date); });
+
+  // 合并：有日程的日期 + G.records 中的日期
+  const allDates = new Set([...scheduleDates]);
+  (G.records || []).forEach(function(r) { if (r.date) allDates.add(r.date); });
+  G.repairedDays.forEach(function(d) { allDates.add(d); });
+
+  const sortedDates = [...allDates].sort(function(a, b) { return b.localeCompare(a); });
+
+  if (sortedDates.length === 0) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>';
     if (header) header.style.display = 'flex';
     return;
   }
   if (header) header.style.display = 'flex';
 
-  const recs = [...G.records].sort((a,b) => b.date.localeCompare(a.date));
-  el.innerHTML = recs.map((r, i) => {
-    const t = r.sleepH * 60 + r.sleepM;
+  el.innerHTML = sortedDates.map(function(dateStr) {
+    const rec = G.records.find(function(r) { return r.date === dateStr; });
+    const hasSchedule = scheduleDates.has(dateStr);
+    const isRepaired = G.repairedDays.indexOf(dateStr) !== -1;
+
+    // 状态判断：已保存 → 已打卡 → 已结算
+    if (!rec && hasSchedule) {
+      // ===== 已保存：只有日程数据，未打卡 =====
+      const schedule = getDaySchedule(dateStr);
+      const segSummary = {};
+      (schedule.segments || []).forEach(function(seg) {
+        if (seg.type === 'unknown') return;
+        segSummary[seg.type] = (segSummary[seg.type] || 0) + (seg.endMin - seg.startMin);
+      });
+      const summaryParts = [];
+      if (segSummary.study) summaryParts.push('学' + segSummary.study + '分');
+      if (segSummary.work) summaryParts.push('工' + segSummary.work + '分');
+      if (segSummary.sport) summaryParts.push('运' + segSummary.sport + '分');
+      if (segSummary.waste) summaryParts.push('浪费' + segSummary.waste + '分');
+      if (segSummary.fun) summaryParts.push('娱乐' + segSummary.fun + '分');
+      if (segSummary.daily) summaryParts.push('日常' + segSummary.daily + '分');
+      if (segSummary.sleep) summaryParts.push('睡眠' + segSummary.sleep + '分');
+      const summaryStr = summaryParts.length > 0 ? summaryParts.join(' ') : '暂无时段';
+
+      return `
+        <div class="history-item" style="border-color:rgba(85,239,196,0.4);">
+          <div class="history-actions">
+            <button class="history-action-btn" title="日程" onclick="openScheduleModal('${dateStr}')">📅</button>
+            <button class="history-action-btn" title="打卡" onclick="openManualCheckinModal('${dateStr}')" style="color:var(--green);font-weight:700;">✅</button>
+            <button class="history-action-btn" title="删除日程" onclick="deleteScheduleOnlyDate('${dateStr}')">🗑️</button>
+          </div>
+          <div class="history-date">${formatDate(dateStr)}</div>
+          <div class="history-scores">
+            <span class="badge" style="background:rgba(85,239,196,0.25);color:#55efc4;border:1px solid rgba(85,239,196,0.4);">已保存</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">${summaryStr}</div>
+        </div>`;
+    }
+
+    if (isRepaired && !rec) {
+      // 补签日期但无记录（理论上不会出现）
+      return `
+        <div class="history-item" style="border-color:rgba(245,166,35,0.3);">
+          <div class="history-actions">
+            <button class="history-action-btn" title="删除补签" onclick="deleteRepairedDay('${dateStr}')">🗑️</button>
+          </div>
+          <div class="history-date">${formatDate(dateStr)}</div>
+          <span class="badge badge-gold">🎟️ 补打卡</span>
+        </div>`;
+    }
+
+    // ===== 已打卡 / 已结算（有 rec 记录）=====
+    const r = rec;
+    const t = (r.sleepH || 0) * 60 + (r.sleepM || 0);
     const sleepTag = t <= 22*60+30 ? '<span class="badge badge-gold">22:30前</span>'
                    : t <= 23*60    ? '<span class="badge badge-blue">23:00前</span>'
                    : t <= 23*60+30 ? '<span class="badge badge-purple">23:30前</span>'
@@ -4068,7 +4132,6 @@ function renderHistory() {
       : (r.checkedIn
         ? '<span class="badge badge-green">已打卡</span>'
         : '<span class="badge badge-red">未打卡</span>');
-    // 已填充附加分显示
     var filledInfo = '';
     if ((r.filledStudyBonus||0) + (r.filledWorkBonus||0) + (r.filledSportBonus||0) > 0) {
       var fillParts = [];
@@ -4077,7 +4140,6 @@ function renderHistory() {
       if (r.filledSportBonus) fillParts.push('运+' + r.filledSportBonus);
       filledInfo = '<div style="font-size:11px;color:var(--gold);margin-top:4px;">📊 填充: ' + fillParts.join(' ') + '</div>';
     }
-    // 填充附加分按钮（未打卡且未结算的记录显示）
     var fillBtn = (!r.checkedIn && !r.settled)
       ? '<button class="history-action-btn" title="填充附加分" onclick="openFillBonusModal(\'' + r.date + '\')" style="color:var(--gold);">📊</button>'
       : '';
@@ -4105,14 +4167,7 @@ function renderHistory() {
         </div>
         ${filledInfo}
       </div>`;
-  }).join('') + G.repairedDays.map(d => `
-    <div class="history-item" style="border-color:rgba(245,166,35,0.3);">
-      <div class="history-actions">
-        <button class="history-action-btn" title="删除补签" onclick="deleteRepairedDay('${d}')">🗑️</button>
-      </div>
-      <div class="history-date">${formatDate(d)}</div>
-      <span class="badge badge-gold">🎟️ 补打卡</span>
-    </div>`).join('');
+  }).join('');
 }
 
 // ========== TAB 切换 ==========
@@ -5144,7 +5199,6 @@ function handleFileImport(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data || typeof data !== 'object') throw new Error('无效的文件格式');
-      // 验证至少包含一个已知 key
       const hasKnown = SYNC_DATA_KEYS.some(k => data[k] !== undefined);
       if (!hasKnown) throw new Error('未识别的备份文件');
       if (!confirm('导入将覆盖当前本地数据，确定继续？')) return;
@@ -5161,6 +5215,8 @@ function handleFileImport(event) {
   };
   reader.readAsText(file);
 }
+
+// 为导入的日程数据自动创建打卡记录（如果不存在）
 
 // ========== 云端同步 (GitHub Gist) ==========
 // (SYNC_TOKEN_KEY 等常量已移至文件顶部)
@@ -5360,23 +5416,57 @@ async function pullFromCloud(btn) {
     if (!file || !file.content) throw new Error('云端无数据文件');
     var cloudData = JSON.parse(file.content);
 
-    applyAllData(cloudData);
+    try {
+      applyAllData(cloudData);
+      console.log('[sync] applyAllData 完成');
+    } catch(e1) {
+      console.error('[sync] applyAllData 错误:', e1);
+      throw new Error('applyAllData 失败: ' + e1.message);
+    }
 
-    if (s) s.innerHTML = '<span style="color:#55efc4;">✅ 下载成功！数据已恢复</span>';
-    showToast('☁️ 已从云端恢复数据');
+    if (s) s.innerHTML = '<span style="color:#55efc4;">✅ 数据写入成功！正在刷新界面...</span>';
+    showToast('☁️ 数据已写入，正在刷新界面...');
 
     // Refresh entire UI
-    G = loadData();
-    displayToday(); updatePreview(); renderAll();
-    timerAccum = loadTimerAccum(); renderTimerAccum();
-    updateSleepView(); renderSleepHistory();
+    try {
+      console.log('[sync] 开始 loadData()');
+      G = loadData();
+      console.log('[sync] loadData 完成, G.records 数量:', (G.records||[]).length);
+    } catch(e2) {
+      console.error('[sync] loadData 错误:', e2);
+      throw new Error('loadData 失败: ' + e2.message);
+    }
+    
+    try {
+      displayToday(); updatePreview(); renderAll();
+      console.log('[sync] 主界面刷新完成');
+    } catch(e3) {
+      console.error('[sync] 主界面刷新错误:', e3);
+      throw new Error('主界面刷新失败: ' + e3.message);
+    }
+    
+    try {
+      timerAccum = loadTimerAccum(); renderTimerAccum();
+      updateSleepView(); renderSleepHistory();
+      console.log('[sync] 睡眠界面刷新完成');
+    } catch(e4) {
+      console.error('[sync] 睡眠界面刷新错误:', e4);
+      throw new Error('睡眠界面刷新失败: ' + e4.message);
+    }
   } catch(e) {
     var errMsg = e.message || '未知错误';
     if (e.name === 'AbortError') errMsg = '连接超时(10秒)，国内网络可能无法访问 api.github.com';
     console.error('[sync] pullFromCloud error:', e);
-    if (s) s.innerHTML = '<span style="color:#fc5c65;">❌ 下载失败: ' + errMsg + '</span>';
+    // 显示详细错误信息（包含堆栈）
+    var detailMsg = errMsg;
+    if (e.stack) {
+      // 提取堆栈第一行
+      var stackLine = e.stack.split('\n')[1] || '';
+      if (stackLine) detailMsg += ' | ' + stackLine.trim();
+    }
+    if (s) s.innerHTML = '<span style="color:#fc5c65;font-size:13px;">❌ 下载失败: ' + detailMsg + '</span>';
     showToast('❌ 云端下载失败: ' + errMsg);
-
+    
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = origText2 || '📥 从云下载'; }
   }
@@ -5457,6 +5547,21 @@ function openManualCheckinModal(dateStr) {
       document.getElementById('manualWork').value = rec.workM;
       document.getElementById('manualSport').value = rec.sportM;
       document.getElementById('manualPhone').value = rec.phoneM;
+    } else {
+      // 无打卡记录：从日程数据预填
+      var schedule = getDaySchedule(dateStr);
+      var studyM = 0, workM = 0, sportM = 0, wasteM = 0;
+      (schedule.segments || []).forEach(function(seg) {
+        var dur = seg.endMin - seg.startMin;
+        if (seg.type === 'study') studyM += dur;
+        else if (seg.type === 'work') workM += dur;
+        else if (seg.type === 'sport') sportM += dur;
+        else if (seg.type === 'waste') wasteM += dur;
+      });
+      document.getElementById('manualStudy').value = studyM;
+      document.getElementById('manualWork').value = workM;
+      document.getElementById('manualSport').value = sportM;
+      document.getElementById('manualPhone').value = wasteM;
     }
   } else {
     dateInput.value = today();
@@ -5538,24 +5643,39 @@ function saveManualCheckin() {
   }
   if (_editingCheckinDate) {
     var idx = G.records.findIndex(function(r) { return r.date === _editingCheckinDate; });
-    if (idx === -1) { showToast('原记录不存在'); return; }
-    var old = G.records[idx];
-    if (old.settled) { showToast('该日期已结算，请先取消结算再编辑'); return; }
-    // 未结算：直接更新记录，不触动 G.*
-    // 重新检查打卡条件
-    var swTotal = earnedStudy + earnedWork;
-    var spTotal = earnedSport;
-    var canCheckin = swTotal >= 480 && spTotal >= 5;
-    G.records[idx] = Object.assign({}, old, {
-      date, studyM, workM, sportM, phoneM, sleepH, sleepM,
-      base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus,
-      workScore: sc.workScore, workBonus: sc.workBonus,
-      sportScore: sc.sportScore, sportBonus: sc.sportBonus,
-      earnedStudy, earnedWork, earnedSport, earnedBase,
-      coinEarned, titles, repaired: false,
-      checkedIn: canCheckin
-    });
-    showToast('✅ 已更新 ' + date + ' 的记录（未结算）');
+    if (idx !== -1) {
+      // 更新已有记录
+      var old = G.records[idx];
+      if (old.settled) { showToast('该日期已结算，请先取消结算再编辑'); return; }
+      var swTotal = earnedStudy + earnedWork;
+      var spTotal = earnedSport;
+      var canCheckin = swTotal >= 480 && spTotal >= 5;
+      G.records[idx] = Object.assign({}, old, {
+        date, studyM, workM, sportM, phoneM, sleepH, sleepM,
+        base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus,
+        workScore: sc.workScore, workBonus: sc.workBonus,
+        sportScore: sc.sportScore, sportBonus: sc.sportBonus,
+        earnedStudy, earnedWork, earnedSport, earnedBase,
+        coinEarned, titles, repaired: false,
+        checkedIn: canCheckin
+      });
+      showToast('✅ 已更新 ' + date + ' 的记录（未结算）');
+    } else {
+      // 无已有记录（已保存→打卡）：创建新记录
+      var swTotal2 = earnedStudy + earnedWork;
+      var spTotal2 = earnedSport;
+      var canCheckin2 = swTotal2 >= 480 && spTotal2 >= 5;
+      G.records.push({ date, studyM, workM, sportM, phoneM, sleepH, sleepM,
+        base: sc.base, studyScore: sc.studyScore, studyBonus: sc.studyBonus,
+        workScore: sc.workScore, workBonus: sc.workBonus,
+        sportScore: sc.sportScore, sportBonus: sc.sportBonus,
+        earnedStudy, earnedWork, earnedSport, earnedBase,
+        coinEarned, repaired: false, titles, settled: false,
+        checkedIn: canCheckin2,
+        filledStudyBonus: 0, filledWorkBonus: 0, filledSportBonus: 0
+      });
+      showToast('✅ 已添加 ' + date + ' 的打卡记录（未结算）');
+    }
   } else {
     if (G.records.find(function(r) { return r.date === date; })) {
       showToast('该日期已有打卡记录，请使用编辑功能');
@@ -5608,6 +5728,19 @@ function deleteRepairedDay(date) {
   saveData(G);
   renderAll();
   showToast('🗑️ 已删除 ' + date + ' 的补签');
+}
+
+// 删除只有日程数据（未打卡）的日期
+function deleteScheduleOnlyDate(date) {
+  if (!confirm('确定删除 ' + date + ' 的日程数据吗？')) return;
+  var schedules = loadScheduleData();
+  schedules = schedules.filter(function(s) { return s.date !== date; });
+  saveScheduleData(schedules);
+  // 同时清除补签标记
+  G.repairedDays = G.repairedDays.filter(function(d) { return d !== date; });
+  saveData(G);
+  renderAll();
+  showToast('🗑️ 已删除 ' + date + ' 的日程');
 }
 
 // ===== TIMER TAG & NOTE MODAL =====
@@ -5792,7 +5925,17 @@ var SCHEDULE_TYPE_CFG = {
 };
 
 function loadScheduleData() {
-  try { var r = localStorage.getItem(SCHEDULE_KEY); if (r) return JSON.parse(r); } catch(e) {}
+  try { 
+    var r = localStorage.getItem(SCHEDULE_KEY); 
+    if (r) {
+      var parsed = JSON.parse(r); 
+      // 兼容两种格式：直接数组 或 {codex_schedule_v1: [...]}
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.codex_schedule_v1) {
+        return parsed.codex_schedule_v1;
+      }
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch(e) {} 
   return [];
 }
 function saveScheduleData(data) {
@@ -5876,7 +6019,7 @@ function getDaySchedule(date) {
   var sleepSegs = generateFromSleep(date);
   var schedules = loadScheduleData();
   var schedule = schedules.find(function(s) { return s.date === date; });
-  var manualSegs = schedule ? schedule.segments.filter(function(s) { return s.source === 'manual'; }) : [];
+  var manualSegs = schedule ? schedule.segments.filter(function(s) { return s.source === 'manual' || s.source === 'import'; }) : [];
   var all = [].concat(timerSegs, sleepSegs, manualSegs);
   all.sort(function(a, b) { return a.startMin - b.startMin; });
   return { date: date, segments: fillGaps(all) };
