@@ -4069,35 +4069,42 @@ function calDayClick(dateStr) {
 
 // ===== 历史 - 三组状态：保存/打卡/结算 =====
 function renderHistory() {
-  renderCalendar(); // 渲染月历
-  const el = document.getElementById('historyList');
-  const header = document.getElementById('historyHeader');
+  try { renderCalendar(); } catch(ec) { console.error('renderCalendar 错误:', ec); }
+  var el = document.getElementById('historyList');
+  var header = document.getElementById('historyHeader');
+  if (!el) return;
 
   // 收集所有有日程的日期
-  const schedules = loadScheduleData();
-  const scheduleDates = new Set();
-  (schedules || []).forEach(function(s) { if (s.date) scheduleDates.add(s.date); });
+  var schedules = [];
+  try { schedules = loadScheduleData() || []; } catch(es) { console.error('loadScheduleData 错误:', es); }
+  var scheduleDates = new Set();
+  schedules.forEach(function(s) { if (s && s.date) scheduleDates.add(s.date); });
 
   // 收集所有有睡眠打卡的日期
-  var sleepLogs = loadSleepLog();
+  var sleepLogs = [];
+  try { sleepLogs = loadSleepLog() || []; } catch(esl) { console.error('loadSleepLog 错误:', esl); }
   var sleepDates = new Set();
   sleepLogs.forEach(function(l) {
-    if (!l || l.sleepH == null) return; // 防御：空元素或缺少sleepH
-    if (l.wakeH == null) return; // 未起床不算完成
-    var isCrossDay = (l.wakeH * 60 + (l.wakeM || 0)) < (l.sleepH * 60 + l.sleepM) && l.sleepH >= 18;
-    if (!isCrossDay) {
-      sleepDates.add(l.date);
-    } else {
-      sleepDates.add(dayBefore(l.date));
-    }
+    if (!l || l.sleepH == null) return;
+    if (l.wakeH == null) return;
+    try {
+      var isCrossDay = (l.wakeH * 60 + (l.wakeM || 0)) < (l.sleepH * 60 + l.sleepM) && l.sleepH >= 18;
+      if (!isCrossDay) {
+        sleepDates.add(l.date);
+      } else {
+        sleepDates.add(dayBefore(l.date));
+      }
+    } catch(ec2) { console.error('sleepDate parse err:', ec2); }
   });
 
-  // 合并：有日程的日期 + G.records 中的日期 + 睡眠打卡日期
-  const allDates = new Set([...scheduleDates, ...sleepDates]);
-  (G.records || []).forEach(function(r) { if (r.date) allDates.add(r.date); });
-  G.repairedDays.forEach(function(d) { allDates.add(d); });
+  // 合并日期
+  var allDates = new Set();
+  try { allDates = new Set([...scheduleDates, ...sleepDates]); } catch(em) { console.error('merge dates err:', em); }
+  if (G.records) { try { G.records.forEach(function(r) { if (r && r.date) allDates.add(r.date); }); } catch(er) {} }
+  if (G.repairedDays) { try { G.repairedDays.forEach(function(d) { allDates.add(d); }); } catch(erp) {} }
 
-  const sortedDates = [...allDates].sort(function(a, b) { return b.localeCompare(a); });
+  var sortedDates = [];
+  try { sortedDates = [...allDates].sort(function(a, b) { return b.localeCompare(a); }); } catch(esort) { console.error('sort err:', esort); }
 
   if (sortedDates.length === 0) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📜</div>暂无历史记录</div>';
@@ -4107,12 +4114,13 @@ function renderHistory() {
   if (header) header.style.display = 'flex';
 
   el.innerHTML = sortedDates.map(function(dateStr) {
-    const rec = G.records.find(function(r) { return r.date === dateStr; });
-    const hasSchedule = scheduleDates.has(dateStr);
-    const hasSleep = sleepDates.has(dateStr);
-    const hasLabor = !!rec; // 有打卡记录 = 劳动打卡完成
-    const isRepaired = G.repairedDays.indexOf(dateStr) !== -1;
-    const bothCheckin = hasSleep && hasLabor;
+    try {
+    var rec = G.records ? G.records.find(function(r) { return r.date === dateStr; }) : null;
+    var hasSchedule = scheduleDates.has(dateStr);
+    var hasSleep = sleepDates.has(dateStr);
+    var hasLabor = !!rec;
+    var isRepaired = G.repairedDays ? G.repairedDays.indexOf(dateStr) !== -1 : false;
+    var bothCheckin = hasSleep && hasLabor;
 
     // === 状态1：保存状态 ===
     var saveBadge = hasSchedule
@@ -4229,12 +4237,16 @@ function renderHistory() {
           ${sleepTag}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="history-total">学${r.studyScore+r.studyBonus} 工${r.workScore+r.workBonus} 运${r.sportScore+r.sportBonus} 基${r.base}</span>
-          <span style="color:var(--gold);font-size:13px;">+${r.coinEarned}金币</span>
+          <span class="history-total">学${(r.studyScore||0)+(r.studyBonus||0)} 工${(r.workScore||0)+(r.workBonus||0)} 运${(r.sportScore||0)+(r.sportBonus||0)} 基${r.base||0}</span>
+          <span style="color:var(--gold);font-size:13px;">+${r.coinEarned||0}金币</span>
         </div>
         ${filledInfo}
         ${checkinDetail ? '<div style="margin-top:4px;">' + checkinDetail + '</div>' : ''}
       </div>`;
+    } catch(itemErr) {
+      console.error('renderHistory item error:', dateStr, itemErr);
+      return '<div style="color:#fc5c65;padding:8px;font-size:12px;">⚠️ ' + dateStr + ' 渲染失败: ' + (itemErr.message||'') + '</div>';
+    }
   }).join('');
 }
 
@@ -5567,7 +5579,7 @@ async function pullFromCloud(btn) {
       showToast('✅ 刷新完成！已加载 ' + (G.records||[]).length + ' 条记录');
     } catch(e3e) {
       console.error('[sync] renderHistory 错误:', e3e);
-      showToast('⚠️ 历史界面渲染出错，请切换到历史tab重试');
+      showToast('⚠️ 历史渲染错误: ' + (e3e.message||'未知'));
     }
     
     try {
