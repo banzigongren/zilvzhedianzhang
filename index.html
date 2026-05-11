@@ -2547,6 +2547,54 @@
 </div>
 
 <!-- ============================== -->
+<!-- EDIT TIMER RECORD MODAL         -->
+<!-- ============================== -->
+<div class="manual-modal-overlay" id="editTimerOverlay" style="display:none;">
+  <div class="manual-modal">
+    <button class="close-btn" onclick="closeEditTimerModal()">✕</button>
+    <h2>✏️ 编辑计时记录</h2>
+
+    <div class="manual-section">
+      <div class="manual-section-title">📋 基本信息</div>
+      <div class="manual-date-row">
+        <label>日期</label>
+        <input type="date" id="editTimerDate">
+      </div>
+      <div class="manual-row" style="margin-top:8px;">
+        <label>模式</label>
+        <select id="editTimerMode">
+          <option value="study">📚 学习</option>
+          <option value="work">💼 工作</option>
+          <option value="sport">🏃 运动</option>
+        </select>
+      </div>
+      <div class="manual-row" style="margin-top:8px;">
+        <label>时长</label>
+        <input type="number" id="editTimerMins" min="1" max="720" placeholder="0" inputmode="numeric">
+        <span class="unit">分钟</span>
+      </div>
+    </div>
+
+    <div class="manual-section">
+      <div class="manual-section-title">🏷️ 标签与备注</div>
+      <div class="manual-row">
+        <label>标签</label>
+        <input type="text" id="editTimerTag" placeholder="可选标签" maxlength="12" style="flex:1;">
+      </div>
+      <div style="margin-top:8px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">备注</label>
+        <textarea id="editTimerNote" placeholder="可选备注" maxlength="100" rows="2" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:13px;resize:none;"></textarea>
+      </div>
+    </div>
+
+    <div class="manual-btn-row">
+      <button class="btn btn-sm" style="background:rgba(233,69,96,0.2);color:#e94560;flex:1;" onclick="deleteTimerRecord()">🗑️ 删除</button>
+      <button class="btn btn-gold btn-sm" style="flex:1;" onclick="saveEditTimer()">💾 保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
 <!-- JAVASCRIPT                      -->
 <!-- ============================== -->
 <script>
@@ -3764,6 +3812,101 @@ function deleteSpend() {
   showToast('🗑️ 消费记录已删除，货币已退回');
 }
 
+// ========== 编辑计时记录 ==========
+var _editingTimerIdx = -1;
+
+function openEditTimerModal(idx) {
+  var logs = loadTimerLog();
+  var l = logs[idx];
+  if (!l) return;
+  _editingTimerIdx = idx;
+  document.getElementById('editTimerDate').value = l.date || today();
+  document.getElementById('editTimerMode').value = l.mode || 'study';
+  document.getElementById('editTimerMins').value = l.mins || 0;
+  document.getElementById('editTimerTag').value = l.tag || '';
+  document.getElementById('editTimerNote').value = l.note || '';
+  document.getElementById('editTimerOverlay').style.display = 'flex';
+}
+
+function closeEditTimerModal() {
+  document.getElementById('editTimerOverlay').style.display = 'none';
+  _editingTimerIdx = -1;
+}
+
+function saveEditTimer() {
+  if (_editingTimerIdx < 0) return;
+  var logs = loadTimerLog();
+  var oldRec = logs[_editingTimerIdx];
+  if (!oldRec) return;
+
+  var date = document.getElementById('editTimerDate').value;
+  var mode = document.getElementById('editTimerMode').value;
+  var mins = parseInt(document.getElementById('editTimerMins').value) || 0;
+  var tag = document.getElementById('editTimerTag').value.trim();
+  var note = document.getElementById('editTimerNote').value.trim();
+
+  if (!date) { showToast('请选择日期'); return; }
+  if (mins < 1) { showToast('时长至少为1分钟'); return; }
+
+  // 修正今日累计：如果旧记录是今日的，先减去旧值
+  var oldDate = oldRec.date;
+  var oldMode = oldRec.mode;
+  var oldMins = oldRec.mins || 0;
+
+  if (oldDate === today()) {
+    timerAccum[oldMode] = Math.max(0, (timerAccum[oldMode] || 0) - oldMins);
+  }
+
+  // 更新记录
+  logs[_editingTimerIdx] = {
+    date: date,
+    mode: mode,
+    mins: mins,
+    time: oldRec.time || '--:--',
+    tag: tag,
+    note: note
+  };
+  if (oldRec.manual) logs[_editingTimerIdx].manual = true;
+  saveTimerLog(logs);
+
+  // 如果新记录是今日的，加上新值
+  if (date === today()) {
+    timerAccum[mode] = (timerAccum[mode] || 0) + mins;
+  }
+  saveTimerAccum(timerAccum);
+
+  closeEditTimerModal();
+  renderTimerLog();
+  renderTimerAccum();
+  refreshStatsSchedule();
+  showToast('✅ 计时记录已更新');
+}
+
+function deleteTimerRecord() {
+  if (_editingTimerIdx < 0) return;
+  var logs = loadTimerLog();
+  var rec = logs[_editingTimerIdx];
+  if (!rec) return;
+
+  var cfg = MODE_CFG[rec.mode] || {icon:'', label:''};
+  if (!confirm('确定删除' + cfg.icon + ' ' + rec.mins + '分钟的计时记录？')) return;
+
+  // 修正今日累计
+  if (rec.date === today()) {
+    timerAccum[rec.mode] = Math.max(0, (timerAccum[rec.mode] || 0) - (rec.mins || 0));
+    saveTimerAccum(timerAccum);
+  }
+
+  logs.splice(_editingTimerIdx, 1);
+  saveTimerLog(logs);
+
+  closeEditTimerModal();
+  renderTimerLog();
+  renderTimerAccum();
+  refreshStatsSchedule();
+  showToast('🗑️ 计时记录已删除');
+}
+
 // ========== 渲染全部 ==========
 function renderAll() {
   renderStats();
@@ -4737,25 +4880,31 @@ function renderTimerAccum() {
 }
 
 function renderTimerLog() {
-  const logs = loadTimerLog().filter(l => l.date === today()).reverse();
+  var allLogs = loadTimerLog();
+  const todayLogs = allLogs.map(function(l, idx) { return {l:l, idx:idx}; }).filter(function(o) { return o.l.date === today(); }).reverse();
   const el = document.getElementById('timerLog');
-  if (logs.length === 0) {
+  if (todayLogs.length === 0) {
     el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px;font-size:13px;">暂无记录</div>';
     return;
   }
-  el.innerHTML = logs.map(l => {
+  el.innerHTML = todayLogs.map(function(o) {
+    var l = o.l;
+    var realIdx = o.idx;
     const cfg = MODE_CFG[l.mode];
-    const tagHtml = l.tag ? `<span class="timer-log-tag">${l.tag}</span>` : '';
-    const noteHtml = l.note ? `<div class="timer-log-note">📝 ${l.note}</div>` : '';
+    const tagHtml = l.tag ? '<span class="timer-log-tag">' + l.tag + '</span>' : '';
+    const noteHtml = l.note ? '<div class="timer-log-note">📝 ' + l.note + '</div>' : '';
     return `
-      <div class="timer-log-item">
+      <div class="timer-log-item" style="cursor:pointer;" onclick="openEditTimerModal(${realIdx})">
         <div style="display:flex;align-items:center;flex:1;gap:4px;flex-wrap:wrap;">
           <span class="timer-log-type" style="color:${cfg.color}">${cfg.icon} ${l.mode === 'study' ? '学习' : l.mode === 'work' ? '工作' : '运动'}</span>
           ${tagHtml}
           <span class="timer-log-dur">+${l.mins} 分钟</span>
         </div>
-        <span class="timer-log-time">${l.time}</span>
-        ${noteHtml ? `<div style="width:100%">${noteHtml}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="timer-log-time">${l.time}</span>
+          <span style="color:var(--gold);font-size:10px;">✏️</span>
+        </div>
+        ${noteHtml ? '<div style="width:100%">' + noteHtml + '</div>' : ''}
       </div>`;
   }).join('');
 }
