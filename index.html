@@ -2271,7 +2271,7 @@
 
     <div class="manual-date-row">
       <label>日期</label>
-      <input type="date" id="manualTimerDate">
+      <input type="date" id="manualTimerDate" onchange="autoFillTimerStart()">
     </div>
 
     <div class="timer-manual-row">
@@ -2284,8 +2284,16 @@
     </div>
 
     <div class="timer-manual-row">
+      <label style="font-size:13px;color:var(--muted);min-width:50px;">开始</label>
+      <input type="time" id="manualTimerStart" onchange="calcManualTimerMins()" style="flex:1;">
+    </div>
+    <div class="timer-manual-row" style="margin-top:6px;">
+      <label style="font-size:13px;color:var(--muted);min-width:50px;">结束</label>
+      <input type="time" id="manualTimerEnd" onchange="calcManualTimerMins()" style="flex:1;">
+    </div>
+    <div class="timer-manual-row" style="margin-top:6px;">
       <label style="font-size:13px;color:var(--muted);min-width:50px;">时长</label>
-      <input type="number" id="manualTimerMins" min="1" max="600" placeholder="分钟" inputmode="numeric">
+      <input type="number" id="manualTimerMins" min="1" max="1440" placeholder="0" inputmode="numeric" onchange="calcManualTimerEnd()">
       <span style="font-size:12px;color:var(--muted);">分钟</span>
     </div>
 
@@ -2572,8 +2580,16 @@
         </select>
       </div>
       <div class="manual-row" style="margin-top:8px;">
+        <label>开始</label>
+        <input type="time" id="editTimerStart" onchange="calcEditTimerMins()" style="flex:1;">
+      </div>
+      <div class="manual-row" style="margin-top:6px;">
+        <label>结束</label>
+        <input type="time" id="editTimerEnd" onchange="calcEditTimerMins()" style="flex:1;">
+      </div>
+      <div class="manual-row" style="margin-top:6px;">
         <label>时长</label>
-        <input type="number" id="editTimerMins" min="1" max="720" placeholder="0" inputmode="numeric">
+        <input type="number" id="editTimerMins" min="1" max="1440" placeholder="0" inputmode="numeric" onchange="calcEditTimerEnd2()">
         <span class="unit">分钟</span>
       </div>
     </div>
@@ -3826,11 +3842,57 @@ function openEditTimerModal(idx) {
   document.getElementById('editTimerDate').value = l.date || today();
   document.getElementById('editTimerMode').value = l.mode || 'study';
   document.getElementById('editTimerMins').value = l.mins || 0;
+  // 填充开始/结束时间
+  if (l.startMin != null && l.startMin >= 0) {
+    document.getElementById('editTimerStart').value = minToTime(l.startMin);
+  } else if (l.time && l.time !== '--:--' && l.mins) {
+    // 从结束时间反推开始时间
+    var endMin = timeToMin(l.time);
+    if (endMin >= 0) {
+      document.getElementById('editTimerStart').value = minToTime((endMin - l.mins + 1440) % 1440);
+    } else {
+      document.getElementById('editTimerStart').value = '';
+    }
+  } else {
+    document.getElementById('editTimerStart').value = '';
+  }
+  if (l.endMin != null && l.endMin >= 0) {
+    document.getElementById('editTimerEnd').value = minToTime(l.endMin);
+  } else if (l.time && l.time !== '--:--') {
+    document.getElementById('editTimerEnd').value = l.time;
+  } else {
+    document.getElementById('editTimerEnd').value = '';
+  }
   document.getElementById('editTimerTag').value = l.tag || '';
   document.getElementById('editTimerNote').value = l.note || '';
   document.getElementById('editTimerOverlay').classList.add('show');
 }
 window.openEditTimerModal = openEditTimerModal;
+
+// 编辑弹窗：开始/结束时间变化时自动算时长
+function calcEditTimerMins() {
+  var startVal = document.getElementById('editTimerStart').value;
+  var endVal = document.getElementById('editTimerEnd').value;
+  if (!startVal || !endVal) return;
+  var sMin = timeToMin(startVal);
+  var eMin = timeToMin(endVal);
+  if (sMin < 0 || eMin < 0) return;
+  var diff = eMin - sMin;
+  if (diff <= 0) diff += 1440;
+  if (diff > 1440) diff = 1440;
+  document.getElementById('editTimerMins').value = diff;
+}
+
+// 编辑弹窗：时长变化时自动算结束时间
+function calcEditTimerEnd2() {
+  var startVal = document.getElementById('editTimerStart').value;
+  var mins = parseInt(document.getElementById('editTimerMins').value) || 0;
+  if (!startVal || mins < 1) return;
+  var sMin = timeToMin(startVal);
+  if (sMin < 0) return;
+  var eMin = (sMin + mins) % 1440;
+  document.getElementById('editTimerEnd').value = minToTime(eMin);
+}
 
 function closeEditTimerModal() {
   document.getElementById('editTimerOverlay').classList.remove('show');
@@ -3862,16 +3924,30 @@ function saveEditTimer() {
     timerAccum[oldMode] = Math.max(0, (timerAccum[oldMode] || 0) - oldMins);
   }
 
+  // 计算时间字段
+  var startVal = document.getElementById('editTimerStart').value;
+  var endVal = document.getElementById('editTimerEnd').value;
+  var timeStr = oldRec.time || '--:--';
+  var startMin = startVal ? timeToMin(startVal) : -1;
+  var endMin = endVal ? timeToMin(endVal) : -1;
+  if (endVal) {
+    timeStr = endVal;
+  } else if (startVal && mins > 0 && startMin >= 0) {
+    timeStr = minToTime((startMin + mins) % 1440);
+  }
+
   // 更新记录
   logs[_editingTimerIdx] = {
     date: date,
     mode: mode,
     mins: mins,
-    time: oldRec.time || '--:--',
+    time: timeStr,
     tag: tag,
     note: note
   };
   if (oldRec.manual) logs[_editingTimerIdx].manual = true;
+  if (startMin >= 0) logs[_editingTimerIdx].startMin = startMin;
+  if (endMin >= 0) logs[_editingTimerIdx].endMin = endMin;
   saveTimerLog(logs);
 
   // 如果新记录是今日的，加上新值
@@ -4898,6 +4974,13 @@ function renderTimerLog() {
     const cfg = MODE_CFG[l.mode];
     const tagHtml = l.tag ? '<span class="timer-log-tag">' + l.tag + '</span>' : '';
     const noteHtml = l.note ? '<div class="timer-log-note">📝 ' + l.note + '</div>' : '';
+    // 时间范围显示
+    var timeRangeHtml = '';
+    if (l.startMin != null && l.startMin >= 0 && l.endMin != null && l.endMin >= 0) {
+      timeRangeHtml = '<span class="timer-log-time">' + minToTime(l.startMin) + '-' + minToTime(l.endMin) + '</span>';
+    } else if (l.time && l.time !== '--:--') {
+      timeRangeHtml = '<span class="timer-log-time">' + l.time + '</span>';
+    }
     return `
       <div class="timer-log-item" data-idx="${realIdx}" ontouchstart="" style="cursor:pointer;-webkit-tap-highlight-color:transparent;">
         <div style="display:flex;align-items:center;flex:1;gap:4px;flex-wrap:wrap;">
@@ -4906,7 +4989,7 @@ function renderTimerLog() {
           <span class="timer-log-dur">+${l.mins} 分钟</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
-          <span class="timer-log-time">${l.time}</span>
+          ${timeRangeHtml}
           <span style="color:var(--gold);font-size:10px;">✏️</span>
         </div>
         ${noteHtml ? '<div style="width:100%">' + noteHtml + '</div>' : ''}
@@ -6392,8 +6475,12 @@ var _manualTimerTag = '';
 
 function openManualTimerModal() {
   var overlay = document.getElementById('manualTimerOverlay');
-  document.getElementById('manualTimerDate').value = today();
+  var dateInput = document.getElementById('manualTimerDate');
+  dateInput.value = today();
+  document.getElementById('manualTimerMode').value = 'study';
   document.getElementById('manualTimerMins').value = '';
+  document.getElementById('manualTimerStart').value = '';
+  document.getElementById('manualTimerEnd').value = '';
   _manualTimerTag = '';
   document.getElementById('manualTimerTagInput').value = '';
   document.getElementById('manualTimerNoteInput').value = '';
@@ -6407,7 +6494,88 @@ function openManualTimerModal() {
       return '<span class="tag-chip" data-tag="' + t + '" onclick="toggleManualTimerTag(this)">' + t + '</span>';
     }).join('');
   }
+  // 自动填充开始时间
+  autoFillTimerStart();
   overlay.style.display = 'flex';
+}
+
+// 自动填充开始时间：取该日期最后一条计时记录的结束时间
+function autoFillTimerStart() {
+  var date = document.getElementById('manualTimerDate').value;
+  if (!date) return;
+  var logs = loadTimerLog().filter(function(l) { return l.date === date; });
+  var latestEnd = null;
+
+  // 从计时记录中找最晚的结束时间
+  logs.forEach(function(l) {
+    if (l.time && l.time !== '--:--' && l.mins) {
+      var endMin = timeToMin(l.time);
+      if (endMin > 0) {
+        var startMin = endMin - l.mins;
+        if (latestEnd === null || endMin > latestEnd) {
+          latestEnd = endMin;
+        }
+      }
+    }
+  });
+
+  // 也从日程数据中找最晚的结束时间
+  var schedData = loadScheduleData();
+  var sched = schedData.find(function(s) { return s.date === date; });
+  if (sched && sched.segments) {
+    sched.segments.forEach(function(seg) {
+      var endMin = seg.endMin || 0;
+      if (endMin > 0 && (latestEnd === null || endMin > latestEnd)) {
+        latestEnd = endMin;
+      }
+    });
+  }
+
+  if (latestEnd !== null && latestEnd < 1440) {
+    var h = Math.floor(latestEnd / 60);
+    var m = latestEnd % 60;
+    document.getElementById('manualTimerStart').value = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  }
+}
+
+// 时间字符串 "HH:MM" → 分钟数
+function timeToMin(t) {
+  if (!t) return -1;
+  var parts = t.split(':');
+  if (parts.length !== 2) return -1;
+  return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+}
+
+// 分钟数 → 时间字符串 "HH:MM"
+function minToTime(m) {
+  var h = Math.floor(m / 60) % 24;
+  var min = m % 60;
+  return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+}
+
+// 开始/结束时间变化时，自动计算时长
+function calcManualTimerMins() {
+  var startVal = document.getElementById('manualTimerStart').value;
+  var endVal = document.getElementById('manualTimerEnd').value;
+  if (!startVal || !endVal) return;
+  var sMin = timeToMin(startVal);
+  var eMin = timeToMin(endVal);
+  if (sMin < 0 || eMin < 0) return;
+  var diff = eMin - sMin;
+  if (diff <= 0) diff += 1440; // 跨天
+  if (diff > 1440) diff = 1440;
+  document.getElementById('manualTimerMins').value = diff;
+}
+
+// 时长变化时，如果有开始时间，自动算结束时间
+function calcManualTimerEnd() {
+  var startVal = document.getElementById('manualTimerStart').value;
+  var mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
+  if (!startVal || mins < 1) return;
+  var sMin = timeToMin(startVal);
+  if (sMin < 0) return;
+  var eMin = (sMin + mins) % 1440;
+  document.getElementById('manualTimerEnd').value = minToTime(eMin);
 }
 
 function toggleManualTimerTag(el) {
@@ -6447,13 +6615,36 @@ function saveManualTimer() {
   var date = document.getElementById('manualTimerDate').value;
   var mode = document.getElementById('manualTimerMode').value;
   var mins = parseInt(document.getElementById('manualTimerMins').value) || 0;
+  var startVal = document.getElementById('manualTimerStart').value;
+  var endVal = document.getElementById('manualTimerEnd').value;
   var tag = _manualTimerTag;
   var note = document.getElementById('manualTimerNoteInput').value.trim();
   if (!date) { showToast('请选择日期'); return; }
   if (mins < 1) { showToast('时长至少为1分钟'); return; }
   if (tag) ensureTimerTag(tag);
+
+  // 确定显示的时间：用结束时间或开始时间
+  var timeStr = '--:--';
+  if (endVal) {
+    timeStr = endVal;
+  } else if (startVal && mins > 0) {
+    var sMin = timeToMin(startVal);
+    if (sMin >= 0) {
+      timeStr = minToTime((sMin + mins) % 1440);
+    }
+  }
+
+  // 计算开始/结束的分钟数（用于日程同步）
+  var startMin = startVal ? timeToMin(startVal) : -1;
+  var endMin = endVal ? timeToMin(endVal) : (startMin >= 0 ? (startMin + mins) : -1);
+
   var logs = loadTimerLog();
-  logs.push({ date: date, mode: mode, mins: mins, time: '--:--', manual: true, tag: tag, note: note });
+  logs.push({
+    date: date, mode: mode, mins: mins, time: timeStr,
+    manual: true, tag: tag, note: note,
+    startMin: startMin >= 0 ? startMin : undefined,
+    endMin: endMin >= 0 ? endMin : undefined
+  });
   saveTimerLog(logs);
   if (date === today()) {
     timerAccum[mode] += mins;
