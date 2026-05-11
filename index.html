@@ -1380,6 +1380,9 @@
 <!-- ============================== -->
 <div class="page active" id="page-stats">
 
+  <!-- 今日日程时间轴（最上方） -->
+  <div id="statsScheduleTop"></div>
+
   <!-- 打卡输入区 -->
   <div id="checkinInputArea">
     <div class="card" id="sleepDurationCard">
@@ -3741,7 +3744,11 @@ function renderStats() {
       </div>
     </div>`;
 
-  el.innerHTML = statsCards + scheduleCard;
+  el.innerHTML = statsCards;
+
+  // 日程时间轴渲染到顶部容器（今日睡眠时间上方）
+  var topEl = document.getElementById('statsScheduleTop');
+  if (topEl) topEl.innerHTML = scheduleCard;
 
   // 渲染日程时间轴
   renderTimelineIn(schedule.segments, 'statsTimelineTrack', 'statsTimelineTicks', '_stats');
