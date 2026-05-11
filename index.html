@@ -2703,6 +2703,32 @@ function getSleepTimeForDate(dateStr) {
   return { h: 23, m: 0 };
 }
 
+// ========== 日程数据读写 ==========
+function loadScheduleData() {
+  try {
+    var d = JSON.parse(localStorage.getItem('codex_schedule_v1'));
+    return Array.isArray(d) ? d : [];
+  } catch(e) { return []; }
+}
+
+function saveScheduleData(data) {
+  localStorage.setItem('codex_schedule_v1', JSON.stringify(data));
+}
+
+function getDaySchedule(dateStr) {
+  var schedules = loadScheduleData();
+  var segs = schedules.filter(function(s) { return s.date === dateStr; });
+  segs.sort(function(a, b) { return a.startMin - b.startMin; });
+  return { date: dateStr, segments: segs };
+}
+
+// 检查指定日期是否有完整的睡眠打卡（入睡+起床）
+function hasSleepCheckin(dateStr) {
+  var logs = loadSleepLog();
+  var items = getSleepMinutesForDate(logs, dateStr);
+  return items.length > 0;
+}
+
 // ========== 每日称号计算 ==========
 function calcDailyTitles(studyM, workM, sportM, sleepH, sleepM) {
   const morningOrder = workM >= 180;      // 晨序员：180工分=180分钟
@@ -4041,7 +4067,7 @@ function calDayClick(dateStr) {
   openScheduleModal(dateStr);
 }
 
-// ===== 历史 - 加入编辑/删除 =====
+// ===== 历史 - 三组状态：保存/打卡/结算 =====
 function renderHistory() {
   renderCalendar(); // 渲染月历
   const el = document.getElementById('historyList');
@@ -4052,8 +4078,21 @@ function renderHistory() {
   const scheduleDates = new Set();
   (schedules || []).forEach(function(s) { if (s.date) scheduleDates.add(s.date); });
 
-  // 合并：有日程的日期 + G.records 中的日期
-  const allDates = new Set([...scheduleDates]);
+  // 收集所有有睡眠打卡的日期
+  var sleepLogs = loadSleepLog();
+  var sleepDates = new Set();
+  sleepLogs.forEach(function(l) {
+    if (l.wakeH == null) return; // 未起床不算完成
+    var isCrossDay = (l.wakeH * 60 + (l.wakeM || 0)) < (l.sleepH * 60 + l.sleepM) && l.sleepH >= 18;
+    if (!isCrossDay) {
+      sleepDates.add(l.date);
+    } else {
+      sleepDates.add(dayBefore(l.date));
+    }
+  });
+
+  // 合并：有日程的日期 + G.records 中的日期 + 睡眠打卡日期
+  const allDates = new Set([...scheduleDates, ...sleepDates]);
   (G.records || []).forEach(function(r) { if (r.date) allDates.add(r.date); });
   G.repairedDays.forEach(function(d) { allDates.add(d); });
 
@@ -4069,11 +4108,28 @@ function renderHistory() {
   el.innerHTML = sortedDates.map(function(dateStr) {
     const rec = G.records.find(function(r) { return r.date === dateStr; });
     const hasSchedule = scheduleDates.has(dateStr);
+    const hasSleep = sleepDates.has(dateStr);
+    const hasLabor = !!rec; // 有打卡记录 = 劳动打卡完成
     const isRepaired = G.repairedDays.indexOf(dateStr) !== -1;
+    const bothCheckin = hasSleep && hasLabor;
 
-    // 状态判断：已保存 → 已打卡 → 已结算
+    // === 状态1：保存状态 ===
+    var saveBadge = hasSchedule
+      ? '<span class="badge" style="background:rgba(85,239,196,0.25);color:#55efc4;border:1px solid rgba(85,239,196,0.4);">已保存</span>'
+      : '<span class="badge" style="background:rgba(255,255,255,0.05);color:#888;border:1px solid rgba(255,255,255,0.1);">未保存</span>';
+
+    // === 状态2：打卡状态（睡眠+劳动都完成才算已打卡）===
+    var checkinBadge = bothCheckin
+      ? '<span class="badge badge-green">已打卡</span>'
+      : '<span class="badge badge-red">未打卡</span>';
+
+    // === 状态3：结算状态 ===
+    var settleBadge = rec && rec.settled
+      ? '<span class="badge badge-gold">已结算</span>'
+      : '<span class="badge" style="background:rgba(233,69,96,0.15);color:#e94560;border:1px solid rgba(233,69,96,0.3);">未结算</span>';
+
+    // === 日期没有打卡记录但有日程 ===
     if (!rec && hasSchedule) {
-      // ===== 已保存：只有日程数据，未打卡 =====
       const schedule = getDaySchedule(dateStr);
       const segSummary = {};
       (schedule.segments || []).forEach(function(seg) {
@@ -4090,34 +4146,46 @@ function renderHistory() {
       if (segSummary.sleep) summaryParts.push('睡眠' + segSummary.sleep + '分');
       const summaryStr = summaryParts.length > 0 ? summaryParts.join(' ') : '暂无时段';
 
+      // 打卡状态细分
+      var checkinDetail = '';
+      if (!hasLabor) checkinDetail += '<span style="font-size:11px;color:#e94560;">⏳ 待劳动打卡</span>';
+      if (!hasSleep) checkinDetail += (checkinDetail ? ' ' : '') + '<span style="font-size:11px;color:#a29bfe;">⏳ 待睡眠打卡</span>';
+
       return `
         <div class="history-item" style="border-color:rgba(85,239,196,0.4);">
           <div class="history-actions">
             <button class="history-action-btn" title="日程" onclick="openScheduleModal('${dateStr}')">📅</button>
-            <button class="history-action-btn" title="打卡" onclick="openManualCheckinModal('${dateStr}')" style="color:var(--green);font-weight:700;">✅</button>
+            <button class="history-action-btn" title="劳动打卡" onclick="openManualCheckinModal('${dateStr}')" style="color:var(--green);font-weight:700;">✅</button>
             <button class="history-action-btn" title="删除日程" onclick="deleteScheduleOnlyDate('${dateStr}')">🗑️</button>
           </div>
           <div class="history-date">${formatDate(dateStr)}</div>
           <div class="history-scores">
-            <span class="badge" style="background:rgba(85,239,196,0.25);color:#55efc4;border:1px solid rgba(85,239,196,0.4);">已保存</span>
+            ${saveBadge}
+            ${checkinBadge}
+            ${settleBadge}
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">${summaryStr}</div>
+          <div style="margin-top:4px;">${checkinDetail}</div>
         </div>`;
     }
 
+    // === 补签日期但无记录 ===
     if (isRepaired && !rec) {
-      // 补签日期但无记录（理论上不会出现）
       return `
         <div class="history-item" style="border-color:rgba(245,166,35,0.3);">
           <div class="history-actions">
             <button class="history-action-btn" title="删除补签" onclick="deleteRepairedDay('${dateStr}')">🗑️</button>
           </div>
           <div class="history-date">${formatDate(dateStr)}</div>
-          <span class="badge badge-gold">🎟️ 补打卡</span>
+          <div class="history-scores">
+            ${saveBadge}
+            ${checkinBadge}
+            ${settleBadge}
+          </div>
         </div>`;
     }
 
-    // ===== 已打卡 / 已结算（有 rec 记录）=====
+    // === 有打卡记录（劳动打卡已完成）===
     const r = rec;
     const t = (r.sleepH || 0) * 60 + (r.sleepM || 0);
     const sleepTag = t <= 22*60+30 ? '<span class="badge badge-gold">22:30前</span>'
@@ -4127,11 +4195,11 @@ function renderHistory() {
     var settleBtn = r.settled
       ? '<button class="history-action-btn" title="取消结算" onclick="unsettleDate(\'' + r.date + '\')" style="color:#e94560;">🔄</button>'
       : '<button class="history-action-btn" title="结算" onclick="settleDate(\'' + r.date + '\')" style="color:#f5a623;">💰</button>';
-    var settledBadge = r.settled
-      ? '<span class="badge badge-gold">已结算</span>'
-      : (r.checkedIn
-        ? '<span class="badge badge-green">已打卡</span>'
-        : '<span class="badge badge-red">未打卡</span>');
+
+    // 打卡状态细分提示
+    var checkinDetail = '';
+    if (!hasSleep) checkinDetail = '<span style="font-size:11px;color:#a29bfe;">⏳ 待睡眠打卡</span>';
+
     var filledInfo = '';
     if ((r.filledStudyBonus||0) + (r.filledWorkBonus||0) + (r.filledSportBonus||0) > 0) {
       var fillParts = [];
@@ -4154,18 +4222,18 @@ function renderHistory() {
         </div>
         <div class="history-date">${formatDate(r.date)}</div>
         <div class="history-scores">
-          <span class="badge badge-blue">基础 ${r.base}</span>
-          <span class="badge badge-purple">学 ${r.studyScore}</span>
-          <span class="badge badge-green">工 ${r.workScore}</span>
-          <span class="badge badge-red">运 ${r.sportScore}</span>
+          ${saveBadge}
+          ${checkinBadge}
+          ${settleBadge}
           ${sleepTag}
-          ${settledBadge}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span class="history-total">学${r.studyScore+r.studyBonus} 工${r.workScore+r.workBonus} 运${r.sportScore+r.sportBonus} 基${r.base}</span>
           <span style="color:var(--gold);font-size:13px;">+${r.coinEarned}金币</span>
         </div>
         ${filledInfo}
+        ${checkinDetail ? '<div style="margin-top:4px;">' + checkinDetail + '</div>' : ''}
+      </div>`;
       </div>`;
   }).join('');
 }
