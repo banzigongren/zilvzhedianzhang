@@ -2691,7 +2691,7 @@ function getTodaySleepTime() {
 // 从睡眠记录获取指定日期入睡时间
 function getSleepTimeForDate(dateStr) {
   var logs = loadSleepLog();
-  var dateLogs = logs.filter(function(l) { return l.date === dateStr; });
+  var dateLogs = logs.filter(function(l) { return l && l.date === dateStr && l.sleepH != null; });
   if (dateLogs.length > 0) {
     var latest = dateLogs[dateLogs.length - 1];
     return { h: latest.sleepH, m: latest.sleepM };
@@ -4082,6 +4082,7 @@ function renderHistory() {
   var sleepLogs = loadSleepLog();
   var sleepDates = new Set();
   sleepLogs.forEach(function(l) {
+    if (!l || l.sleepH == null) return; // 防御：空元素或缺少sleepH
     if (l.wakeH == null) return; // 未起床不算完成
     var isCrossDay = (l.wakeH * 60 + (l.wakeM || 0)) < (l.sleepH * 60 + l.sleepM) && l.sleepH >= 18;
     if (!isCrossDay) {
@@ -4856,7 +4857,7 @@ function updateSleepView() {
   } else {
     // 检查今天是否有睡眠记录（可能有多条）
     const logs = loadSleepLog();
-    const todayLogs = logs.filter(l => l.date === today());
+    const todayLogs = logs.filter(l => l && l.date === today() && l.sleepH != null);
     if (todayLogs.length > 0) {
       // 显示最新的一条起床结果
       const latestLog = todayLogs[todayLogs.length - 1];
@@ -4880,6 +4881,7 @@ function getSleepMinutesForDate(logs, targetDate) {
   // 返回 [{ sleepH, sleepM, wakeH, wakeM, dur, coins, isCrossDay, crossPart }]
   var results = [];
   logs.forEach(function(l) {
+    if (!l || l.sleepH == null) return; // 防御：空元素或缺少sleepH
     var sleepMin = l.sleepH * 60 + l.sleepM;
     var wakeMin  = (l.wakeH != null ? l.wakeH * 60 + (l.wakeM || 0) : -1);
     var isCrossDay = wakeMin >= 0 && sleepMin >= 18 * 60 && wakeMin < sleepMin;
@@ -5024,7 +5026,7 @@ function refreshSleepDuration() {
 
 function syncSleepToCheckin() {
   const logs = loadSleepLog();
-  const todayLogs = logs.filter(l => l.date === today());
+  const todayLogs = logs.filter(l => l && l.date === today() && l.sleepH != null);
   if (todayLogs.length === 0) {
     showToast('无今日睡眠记录');
     return;
@@ -5048,7 +5050,7 @@ function renderSleepHistory() {
   }
 
   const recent = [...logs].reverse().slice(0, 10);
-  el.innerHTML = recent.map((l, i) => {
+  el.innerHTML = recent.filter(l => l && l.sleepH != null).map((l, i) => {
     const actualIdx = logs.indexOf(l);
     const hrs = Math.floor(l.durationMin / 60);
     const mins = l.durationMin % 60;
@@ -5505,11 +5507,47 @@ async function pullFromCloud(btn) {
     }
     
     try {
-      displayToday(); updatePreview(); renderAll();
-      console.log('[sync] 主界面刷新完成');
-    } catch(e3) {
-      console.error('[sync] 主界面刷新错误:', e3);
-      throw new Error('主界面刷新失败: ' + e3.message);
+      displayToday(); updatePreview();
+      console.log('[sync] displayToday+updatePreview 完成');
+    } catch(e3a) {
+      console.error('[sync] displayToday/updatePreview 错误:', e3a);
+      // 非致命，继续
+    }
+    
+    try {
+      renderStats();
+      console.log('[sync] renderStats 完成');
+    } catch(e3b) {
+      console.error('[sync] renderStats 错误:', e3b);
+    }
+    
+    try {
+      renderWallet();
+      console.log('[sync] renderWallet 完成');
+    } catch(e3c) {
+      console.error('[sync] renderWallet 错误:', e3c);
+    }
+    
+    try {
+      renderStreak();
+      console.log('[sync] renderStreak 完成');
+    } catch(e3d) {
+      console.error('[sync] renderStreak 错误:', e3d);
+    }
+    
+    try {
+      renderHistory();
+      console.log('[sync] renderHistory 完成');
+    } catch(e3e) {
+      console.error('[sync] renderHistory 错误:', e3e);
+    }
+    
+    try {
+      renderQuoteManage();
+      updateExchangePreview();
+      console.log('[sync] 其他渲染完成');
+    } catch(e3f) {
+      console.error('[sync] 其他渲染错误:', e3f);
     }
     
     try {
@@ -5518,7 +5556,6 @@ async function pullFromCloud(btn) {
       console.log('[sync] 睡眠界面刷新完成');
     } catch(e4) {
       console.error('[sync] 睡眠界面刷新错误:', e4);
-      throw new Error('睡眠界面刷新失败: ' + e4.message);
     }
   } catch(e) {
     var errMsg = e.message || '未知错误';
@@ -6651,6 +6688,7 @@ function openManualSleepModal(idx) {
   if (_editingSleepIdx !== null && _editingSleepIdx >= 0) {
     var logs = loadSleepLog();
     var log = logs[_editingSleepIdx];
+    if (!log) { _editingSleepIdx = null; return; }
     title.textContent = '✏️ 编辑睡眠记录';
     saveBtn.textContent = '💾 保存修改';
     dateInput.value = log.date;
