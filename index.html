@@ -5359,7 +5359,13 @@ async function testSync() {
 function collectAllData() {
   const d = { _meta: { version: 3, exportedAt: new Date().toISOString() } };
   SYNC_DATA_KEYS.forEach(k => {
-    try { d[k] = JSON.parse(localStorage.getItem(k) || 'null'); }
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw !== null) {
+        d[k] = JSON.parse(raw);
+      }
+      // raw === null 时不设置 d[k]，避免上传 null 到云端
+    }
     catch(e) { d[k] = localStorage.getItem(k); }
   });
   return d;
@@ -5367,12 +5373,21 @@ function collectAllData() {
 
 function applyAllData(data) {
   if (!data) return;
+  var logMsgs = [];
   SYNC_DATA_KEYS.forEach(k => {
     if (data[k] !== undefined && data[k] !== null) {
       const v = typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k]);
       localStorage.setItem(k, v);
+      logMsgs.push(k + '(√)');
+    } else if (data[k] === null) {
+      // null 表示云端该字段为空，清除本地对应key
+      localStorage.removeItem(k);
+      logMsgs.push(k + '(清除)');
+    } else {
+      logMsgs.push(k + '(跳过:undefined)');
     }
   });
+  console.log('[sync] applyAllData 完成, 写入情况:', logMsgs.join(', '));
 }
 
 async function pushToCloud(btn) {
@@ -5488,6 +5503,9 @@ async function pullFromCloud(btn) {
     try {
       applyAllData(cloudData);
       console.log('[sync] applyAllData 完成');
+      // 验证写入结果
+      var _verify = localStorage.getItem('codex_data_v2');
+      console.log('[sync] 验证: codex_data_v2 写入后长度=', (_verify||'').length, '前50字符=', (_verify||'').substring(0,50));
     } catch(e1) {
       console.error('[sync] applyAllData 错误:', e1);
       throw new Error('applyAllData 失败: ' + e1.message);
@@ -5500,7 +5518,15 @@ async function pullFromCloud(btn) {
     try {
       console.log('[sync] 开始 loadData()');
       G = loadData();
-      console.log('[sync] loadData 完成, G.records 数量:', (G.records||[]).length);
+      var _recLen = (G.records||[]).length;
+      var _repLen = (G.repairedDays||[]).length;
+      console.log('[sync] loadData 完成, G.records 数量:', _recLen, ', G.repairedDays 数量:', _repLen);
+      // 云端记录数 vs 本地记录数 对比
+      var _cloudRecLen = (cloudData['codex_data_v2'] && cloudData['codex_data_v2'].records) ? cloudData['codex_data_v2'].records.length : '(云端无此字段)';
+      console.log('[sync] 云端记录数:', _cloudRecLen, '本地记录数:', _recLen);
+      if (_cloudRecLen !== '(云端无此字段)' && _recLen !== _cloudRecLen) {
+        showToast('⚠️ 警告：云端有' + _cloudRecLen + '条记录，但本地只加载了' + _recLen + '条');
+      }
     } catch(e2) {
       console.error('[sync] loadData 错误:', e2);
       throw new Error('loadData 失败: ' + e2.message);
@@ -5537,9 +5563,11 @@ async function pullFromCloud(btn) {
     
     try {
       renderHistory();
-      console.log('[sync] renderHistory 完成');
+      console.log('[sync] renderHistory 完成, 记录数:', (G.records||[]).length);
+      showToast('✅ 刷新完成！已加载 ' + (G.records||[]).length + ' 条记录');
     } catch(e3e) {
       console.error('[sync] renderHistory 错误:', e3e);
+      showToast('⚠️ 历史界面渲染出错，请切换到历史tab重试');
     }
     
     try {
