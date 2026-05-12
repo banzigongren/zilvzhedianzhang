@@ -2631,7 +2631,7 @@ window.addEventListener('unhandledrejection', function(e) {
 const KEY = 'codex_data_v2';
 const SYNC_TOKEN_KEY = 'codex_sync_token';
 const SYNC_GIST_KEY  = 'codex_sync_gist_id';
-const SYNC_DATA_KEYS = ['codex_data_v2','codex_timer_v1','codex_timer_log_v1','codex_sleep_v1','codex_sleep_log_v1','codex_schedule_v1','codex_quotes_v1'];
+const SYNC_DATA_KEYS = ['codex_data_v2','codex_timer_v1','codex_timer_log_v1','codex_sleep_v1','codex_sleep_log_v1','codex_schedule_v1','codex_quotes_v1','codex_timer_state_v1','codex_pending_timer_v1'];
 
 function loadData() {
   var data;
@@ -4743,8 +4743,10 @@ function showToast(msg) {
 // ========== 计时器模块 ==========
 const TIMER_KEY = 'codex_timer_v1';
 const TIMER_LOG_KEY = 'codex_timer_log_v1';
+const TIMER_STATE_KEY = 'codex_timer_state_v1';   // 运行中计时器状态
+const PENDING_TIMER_KEY = 'codex_pending_timer_v1'; // 待保存的计时数据
 
-// 计时器状态（内存，不持久化——页面刷新后重置）
+// 计时器状态（持久化——页面刷新/后台恢复后可恢复）
 let timerState = {
   mode: 'study',        // study | work | sport
   running: false,
@@ -4768,6 +4770,43 @@ function loadTimerAccum() {
 
 function saveTimerAccum(d) {
   localStorage.setItem(TIMER_KEY, JSON.stringify(d));
+}
+
+// 持久化 timerState（不含 intervalId）
+function saveTimerState() {
+  var s = Object.assign({}, timerState);
+  s.intervalId = null; // intervalId 不可序列化
+  try { localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(s)); } catch(e) {}
+}
+function loadTimerState() {
+  try {
+    var raw = localStorage.getItem(TIMER_STATE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+function clearTimerState() {
+  try { localStorage.removeItem(TIMER_STATE_KEY); } catch(e) {}
+}
+
+// 持久化 _pendingTimer
+function savePendingTimer() {
+  if (_pendingTimer) {
+    try { localStorage.setItem(PENDING_TIMER_KEY, JSON.stringify(_pendingTimer)); } catch(e) {}
+  } else {
+    try { localStorage.removeItem(PENDING_TIMER_KEY); } catch(e) {}
+  }
+}
+function loadPendingTimer() {
+  try {
+    var raw = localStorage.getItem(PENDING_TIMER_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+function clearPendingTimer() {
+  _pendingTimer = null;
+  try { localStorage.removeItem(PENDING_TIMER_KEY); } catch(e) {}
 }
 
 // 计时记录（持久化，按日期过滤）
@@ -4794,10 +4833,91 @@ const MODE_CFG = {
 };
 
 function initTimer() {
-  updateTimerRing(0);
+  // 恢复运行中/暂停中的计时器状态
+  var saved = loadTimerState();
+  if (saved && saved.startTs) {
+    // 检查是否跨日：startTs 对应的日期不是今天，说明昨天忘了停
+    var startDate = new Date(saved.startTs);
+    var startDay = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0') + '-' + String(startDate.getDate()).padStart(2,'0');
+    if (startDay !== today()) {
+      // 跨日了：计算到昨天23:59:59的秒数，自动作为昨天的记录保存
+      var endOfStartDay = new Date(startDate);
+      endOfStartDay.setHours(23, 59, 59, 0);
+      var elapsedToMidnight = Math.floor((endOfStartDay - saved.startTs) / 1000);
+      var mins = Math.floor(elapsedToMidnight / 60);
+      if (mins >= 1) {
+        // 自动保存为昨天的记录（不带标签备注）
+        var yesterDay = startDay;
+        // 只写日志，不累加到今日 timerAccum（因为那是昨天的）
+        var logs = loadTimerLog();
+        logs.push({
+          date: yesterDay,
+          mode: saved.mode,
+          mins: mins,
+          time: '23:59',
+          tag: '',
+          note: '(跨日自动保存)',
+          startMin: startDate.getHours() * 60 + startDate.getMinutes(),
+          endMin: 1439,
+        });
+        saveTimerLog(logs);
+        showToast('⏰ 检测到昨日未停止的计时，已自动保存 ' + mins + ' 分钟到 ' + yesterDay);
+      }
+      clearTimerState();
+      updateTimerRing(0);
+      setTimerMode('study');
+    } else {
+      // 同日恢复
+      var elapsedNow = Math.floor((Date.now() - saved.startTs) / 1000);
+      if (elapsedNow < 0) elapsedNow = 0; // 防止时钟回拨
+
+      // 恢复 mode
+      timerState.mode = saved.mode || 'study';
+      setTimerMode(timerState.mode);
+
+      if (saved.paused) {
+        // 暂停中：恢复 paused 状态，显示暂停时的秒数
+        timerState.paused = true;
+        timerState.running = false;
+        timerState.elapsed = saved.elapsed || 0;
+        timerState.startTs = saved.startTs;
+        updateTimerDisplay(timerState.elapsed);
+        updateTimerRing(timerState.elapsed);
+        document.getElementById('timerSessionMin').textContent = '本次 ' + Math.floor(timerState.elapsed / 60) + ' 分钟';
+        document.getElementById('timerStartBtn').textContent = '▶ 继续';
+        document.getElementById('timerStartBtn').className = 'timer-btn tbtn-start';
+        document.getElementById('timerStopBtn').style.display = 'block';
+      } else {
+        // 运行中：重新开始计时，从 startTs 继续算
+        timerState.running = true;
+        timerState.paused = false;
+        timerState.startTs = saved.startTs;
+        timerState.elapsed = elapsedNow;
+        timerState.intervalId = setInterval(timerTick, 500);
+        updateTimerDisplay(elapsedNow);
+        updateTimerRing(elapsedNow);
+        document.getElementById('timerSessionMin').textContent = '本次 ' + Math.floor(elapsedNow / 60) + ' 分钟';
+        document.getElementById('timerStartBtn').textContent = '⏸ 暂停';
+        document.getElementById('timerStartBtn').className = 'timer-btn tbtn-pause';
+        document.getElementById('timerStopBtn').style.display = 'block';
+      }
+      saveTimerState(); // 确保最新状态保存
+    }
+  } else {
+    updateTimerRing(0);
+    setTimerMode('study');
+  }
+
+  // 恢复待保存的计时数据（用户点了"结束本段"但还没填标签备注）
+  var pending = loadPendingTimer();
+  if (pending) {
+    _pendingTimer = pending;
+    // 自动重新打开标签备注弹窗
+    openTimerTagModal();
+  }
+
   renderTimerAccum();
   renderTimerLog();
-  setTimerMode('study');
 }
 
 function setTimerMode(mode) {
@@ -4837,6 +4957,7 @@ function timerStart() {
     btn.textContent = '⏸ 暂停';
     btn.className = 'timer-btn tbtn-pause';
     stopBtn.style.display = 'block';
+    saveTimerState();
   } else if (!timerState.paused) {
     // 暂停
     timerState.paused = true;
@@ -4845,6 +4966,7 @@ function timerStart() {
     timerState.elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
     btn.textContent = '▶ 继续';
     btn.className = 'timer-btn tbtn-start';
+    saveTimerState();
   }
 }
 
@@ -4875,18 +4997,24 @@ function timerStop() {
   }
 
   // 先暂停界面，等用户填标签备注后再真正保存
+  var now = new Date();
+  var endMinVal = now.getHours() * 60 + now.getMinutes();
+  var startMinVal = Math.max(0, endMinVal - mins);
   _pendingTimer = {
     mode: timerState.mode,
     mins,
-    time: new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }),
+    time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0'),
+    startMin: startMinVal,
+    endMin: endMinVal,
   };
+  savePendingTimer();
   timerReset();
   openTimerTagModal();
 }
 
 function _commitTimerRecord(tag, note) {
   if (!_pendingTimer) return;
-  const { mode, mins, time } = _pendingTimer;
+  const { mode, mins, time, startMin: sMin, endMin: eMin } = _pendingTimer;
 
   // 累加今日
   timerAccum[mode] += mins;
@@ -4901,10 +5029,13 @@ function _commitTimerRecord(tag, note) {
     time,
     tag: tag || '',
     note: note || '',
+    startMin: sMin,
+    endMin: eMin,
   });
   saveTimerLog(logs);
 
   _pendingTimer = null;
+  savePendingTimer(); // 清除持久化的 pending 数据
   showToast(`✅ ${MODE_CFG[mode].icon} ${MODE_CFG[mode].label.replace('计时','')} ${mins} 分钟已记录`);
   renderTimerAccum();
   renderTimerLog();
@@ -4920,6 +5051,7 @@ function timerReset() {
   timerState.paused = false;
   timerState.elapsed = 0;
   timerState.startTs = null;
+  clearTimerState(); // 清除持久化的运行状态
 
   updateTimerDisplay(0);
   updateTimerRing(0);
@@ -6499,37 +6631,41 @@ function openManualTimerModal() {
   overlay.style.display = 'flex';
 }
 
-// 自动填充开始时间：取该日期最后一条计时记录的结束时间
+// 自动填充开始时间：取该日期最后一条记录/时段的结束时间
 function autoFillTimerStart() {
   var date = document.getElementById('manualTimerDate').value;
   if (!date) return;
-  var logs = loadTimerLog().filter(function(l) { return l.date === date; });
   var latestEnd = null;
 
-  // 从计时记录中找最晚的结束时间
-  logs.forEach(function(l) {
-    if (l.time && l.time !== '--:--' && l.mins) {
-      var endMin = timeToMin(l.time);
-      if (endMin > 0) {
-        var startMin = endMin - l.mins;
-        if (latestEnd === null || endMin > latestEnd) {
-          latestEnd = endMin;
+  // 方法1：从 getDaySchedule 获取所有非unknown段的最大 endMin（最全面）
+  try {
+    var schedule = getDaySchedule(date);
+    if (schedule && schedule.segments) {
+      schedule.segments.forEach(function(seg) {
+        if (seg.type !== 'unknown' && seg.endMin > 0) {
+          if (latestEnd === null || seg.endMin > latestEnd) {
+            latestEnd = seg.endMin;
+          }
         }
-      }
+      });
+    }
+  } catch(e) {}
+
+  // 方法2：直接从计时记录中找（兜底，优先使用 startMin/endMin 字段）
+  var logs = loadTimerLog().filter(function(l) { return l.date === date; });
+  logs.forEach(function(l) {
+    var endMin = -1;
+    // 优先用 endMin 字段
+    if (l.endMin !== undefined && l.endMin !== null && l.endMin > 0) {
+      endMin = l.endMin;
+    } else if (l.time && l.time !== '--:--' && l.mins) {
+      // 回退：从 time+mins 推算
+      endMin = timeToMin(l.time);
+    }
+    if (endMin > 0 && (latestEnd === null || endMin > latestEnd)) {
+      latestEnd = endMin;
     }
   });
-
-  // 也从日程数据中找最晚的结束时间
-  var schedData = loadScheduleData();
-  var sched = schedData.find(function(s) { return s.date === date; });
-  if (sched && sched.segments) {
-    sched.segments.forEach(function(seg) {
-      var endMin = seg.endMin || 0;
-      if (endMin > 0 && (latestEnd === null || endMin > latestEnd)) {
-        latestEnd = endMin;
-      }
-    });
-  }
 
   if (latestEnd !== null && latestEnd < 1440) {
     var h = Math.floor(latestEnd / 60);
@@ -6732,11 +6868,18 @@ function generateFromTimer(date) {
   var segs = [];
   var modeMap = { study: 'study', work: 'work', sport: 'sport' };
   logs.forEach(function(log) {
-    if (!log.time || log.time === '--:--') return;
-    var endMin = timeToMin(log.time);
-    var startMin = Math.max(0, endMin - log.mins);
+    // 优先用 startMin/endMin 字段
+    var startMin = log.startMin;
+    var endMin = log.endMin;
+    if (startMin === undefined || startMin === null || endMin === undefined || endMin === null) {
+      // 回退：从 time+mins 推算
+      if (!log.time || log.time === '--:--' || !log.mins) return;
+      endMin = timeToMin(log.time);
+      startMin = Math.max(0, endMin - log.mins);
+    }
+    if (isNaN(startMin) || isNaN(endMin) || endMin <= startMin) return;
     segs.push({
-      id: 'timer_' + log.time + '_' + log.mode,
+      id: 'timer_' + (log.time || startMin) + '_' + log.mode,
       startMin: startMin, endMin: endMin,
       type: modeMap[log.mode] || 'study',
       label: log.tag || '',
@@ -7050,6 +7193,7 @@ function handleLegendClick_stats(id, type, startMin, endMin, label, note) {
 }
 
 function getLastSegEnd() {
+  // 从 getDaySchedule 获取该日所有非unknown段中的最大 endMin
   var schedule = getDaySchedule(today());
   var maxEnd = 0;
   if (schedule && schedule.segments) {
@@ -7057,6 +7201,17 @@ function getLastSegEnd() {
       if (s.type !== 'unknown' && s.endMin > maxEnd) maxEnd = s.endMin;
     });
   }
+  // 也直接从计时记录中查找（作为兜底）
+  var logs = loadTimerLog().filter(function(l) { return l.date === today(); });
+  logs.forEach(function(l) {
+    var endMin = -1;
+    if (l.endMin !== undefined && l.endMin !== null && l.endMin > 0) {
+      endMin = l.endMin;
+    } else if (l.time && l.time !== '--:--' && l.mins) {
+      endMin = timeToMin(l.time);
+    }
+    if (endMin > 0 && endMin > maxEnd) maxEnd = endMin;
+  });
   if (maxEnd >= 1440) maxEnd = 1430;
   return maxEnd;
 }
@@ -7764,7 +7919,61 @@ window.openEditSpendModal = openEditSpendModal;
 window.closeEditSpendModal = closeEditSpendModal;
 window.saveEditSpend = saveEditSpend;
 window.deleteSpend = deleteSpend;
+
+// ========== 计时器后台恢复事件监听 ==========
+// 页面即将卸载（刷新/关闭/跳转）时保存计时器状态
+window.addEventListener('beforeunload', function() {
+  if (timerState.running || timerState.paused) {
+    // 暂停时已保存过 elapsed，运行中需要先更新 elapsed
+    if (timerState.running && timerState.startTs) {
+      timerState.elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+    }
+    saveTimerState();
+  }
+  if (_pendingTimer) {
+    savePendingTimer();
+  }
+});
+
+// 页面可见性变化（切到后台/切回前台）
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // 页面隐藏：保存状态
+    if (timerState.running && timerState.startTs) {
+      timerState.elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+      saveTimerState();
+    }
+  } else {
+    // 页面重新可见：刷新计时器显示
+    if (timerState.running && timerState.startTs) {
+      var elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+      if (elapsed < 0) elapsed = 0;
+      timerState.elapsed = elapsed;
+      updateTimerDisplay(elapsed);
+      updateTimerRing(elapsed);
+      document.getElementById('timerSessionMin').textContent = '本次 ' + Math.floor(elapsed / 60) + ' 分钟';
+    }
+  }
+});
+
+// pageshow 事件：处理 bfcache 恢复（安卓浏览器后退时可能从缓存恢复）
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    // 从 bfcache 恢复，需要刷新计时器显示
+    if (timerState.running && timerState.startTs) {
+      var elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+      if (elapsed < 0) elapsed = 0;
+      timerState.elapsed = elapsed;
+      // 重新启动 setInterval（bfcache 恢复后旧的 interval 可能已失效）
+      clearInterval(timerState.intervalId);
+      timerState.intervalId = setInterval(timerTick, 500);
+      updateTimerDisplay(elapsed);
+      updateTimerRing(elapsed);
+      document.getElementById('timerSessionMin').textContent = '本次 ' + Math.floor(elapsed / 60) + ' 分钟';
+    }
+  }
+});
 </script>
 </body>
-<!-- v 2026-05-11 17:10:44 -->
+<!-- v 2026-05-12 17:40:00 -->
 </html>
