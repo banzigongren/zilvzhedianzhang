@@ -5491,6 +5491,7 @@ function updateSleepView() {
   if (state.isSleeping) {
     document.getElementById('sleepNotInBed').style.display = 'none';
     document.getElementById('sleepWokeUp').style.display = 'none';
+    hideSleepScheduleHint();
   } else {
     // 检查今天是否有睡眠记录（可能有多条）
     const logs = loadSleepLog();
@@ -5505,11 +5506,265 @@ function updateSleepView() {
         latestLog.wakeH, latestLog.wakeM,
         latestLog.coins
       );
+      hideSleepScheduleHint();
     } else {
       document.getElementById('sleepNotInBed').style.display = 'block';
       document.getElementById('sleepWokeUp').style.display = 'none';
+      // 检查日程中是否有睡眠段，显示补录提示
+      showSleepScheduleHint();
     }
   }
+}
+
+// ========== 从日程补录睡眠数据 ==========
+// 获取指定日期日程中的睡眠段（仅手动/导入的sleep段，不含sleep_log自动生成的）
+function getScheduleSleepSegs(dateStr) {
+  var schedules = loadScheduleData();
+  var schedule = schedules.find(function(s) { return s.date === dateStr; });
+  if (!schedule || !schedule.segments) return [];
+  // 只取手动/导入的sleep段（source=manual/import），排除sleep_log自动生成的
+  return schedule.segments.filter(function(seg) {
+    return seg.type === 'sleep' && (seg.source === 'manual' || seg.source === 'import');
+  });
+}
+
+// 显示日程睡眠补录提示卡片
+function showSleepScheduleHint() {
+  var container = document.getElementById('sleepScheduleHint');
+  var todaySegs = getScheduleSleepSegs(today());
+  var yesterday = dayBefore(today());
+  var yesterdayNightSegs = getScheduleSleepSegs(yesterday).filter(function(seg) { return seg.startMin >= 18 * 60; });
+  var hasAny = todaySegs.length > 0 || yesterdayNightSegs.length > 0;
+  if (!hasAny) {
+    hideSleepScheduleHint();
+    return;
+  }
+  // 构建提示内容
+  var totalMin = 0;
+  var detailsHtml = '';
+  // 显示昨晚的睡眠段
+  yesterdayNightSegs.forEach(function(seg, i) {
+    var sh = Math.floor(seg.startMin / 60) % 24;
+    var sm = seg.startMin % 60;
+    var eh = Math.floor(seg.endMin / 60) % 24;
+    var em = seg.endMin % 60;
+    var dur = seg.endMin - seg.startMin;
+    totalMin += dur;
+    var dHrs = Math.floor(dur / 60);
+    var dMins = dur % 60;
+    var dStr = dHrs > 0 ? (dHrs + 'h' + (dMins > 0 ? dMins + 'm' : '')) : (dMins + 'm');
+    detailsHtml += '<div style="display:flex;gap:10px;font-size:12px;color:var(--muted);margin-top:4px;">' +
+      '<span style="color:#a0b4ff;">昨晚</span>' +
+      '<span>😴 ' + String(sh).padStart(2,'0') + ':' + String(sm).padStart(2,'0') + '</span>' +
+      '<span>⏰ ' + String(eh).padStart(2,'0') + ':' + String(em).padStart(2,'0') + '</span>' +
+      '<span style="color:var(--text);">' + dStr + '</span>' +
+    '</div>';
+  });
+  // 显示今天的睡眠段
+  todaySegs.forEach(function(seg, i) {
+    var sh = Math.floor(seg.startMin / 60) % 24;
+    var sm = seg.startMin % 60;
+    var eh = Math.floor(seg.endMin / 60) % 24;
+    var em = seg.endMin % 60;
+    var dur = seg.endMin - seg.startMin;
+    totalMin += dur;
+    var dHrs = Math.floor(dur / 60);
+    var dMins = dur % 60;
+    var dStr = dHrs > 0 ? (dHrs + 'h' + (dMins > 0 ? dMins + 'm' : '')) : (dMins + 'm');
+    detailsHtml += '<div style="display:flex;gap:10px;font-size:12px;color:var(--muted);' + (i > 0 || yesterdayNightSegs.length > 0 ? 'margin-top:4px;' : '') + '">' +
+      '<span>😴 ' + String(sh).padStart(2,'0') + ':' + String(sm).padStart(2,'0') + '</span>' +
+      '<span>⏰ ' + String(eh).padStart(2,'0') + ':' + String(em).padStart(2,'0') + '</span>' +
+      '<span style="color:var(--text);">' + dStr + '</span>' +
+    '</div>';
+  });
+  var totalHrs = Math.floor(totalMin / 60);
+  var totalMins = totalMin % 60;
+  var totalStr = totalHrs > 0 ? (totalHrs + '小时' + (totalMins > 0 ? totalMins + '分钟' : '')) : (totalMins + '分钟');
+  // 计算预计金币（取昨晚的入睡时间，如果没有则取今天第一条）
+  var sleepH, sleepM;
+  if (yesterdayNightSegs.length > 0) {
+    sleepH = Math.floor(yesterdayNightSegs[0].startMin / 60) % 24;
+    sleepM = yesterdayNightSegs[0].startMin % 60;
+  } else {
+    sleepH = Math.floor(todaySegs[0].startMin / 60) % 24;
+    sleepM = todaySegs[0].startMin % 60;
+  }
+  var estCoins = calcSleepCoins(sleepH, sleepM);
+
+  if (!container) {
+    // 首次创建提示卡片
+    container = document.createElement('div');
+    container.id = 'sleepScheduleHint';
+    container.className = 'card';
+    container.style.cssText = 'margin-top:12px;border:1px dashed rgba(160,180,255,0.4);background:rgba(100,120,255,0.06);';
+    var notInBed = document.getElementById('sleepNotInBed');
+    // 插入到"开始睡觉"按钮前面
+    var startBtn = document.getElementById('sleepStartBtn');
+    notInBed.insertBefore(container, startBtn);
+  }
+  container.style.display = 'block';
+  container.innerHTML =
+    '<div class="card-title"><span class="icon">📅</span>检测到日程中的睡眠数据</div>' +
+    '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">检测到日程中的睡眠数据，点击一键补录到睡眠打卡</div>' +
+    detailsHtml +
+    '<div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">' +
+      '<span style="font-size:14px;">总计 <b>' + totalStr + '</b> · 预计 <b style="color:var(--gold);">+' + estCoins + ' 金币</b></span>' +
+      '<button onclick="fillSleepFromSchedule()" style="padding:8px 16px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:13px;cursor:pointer;">✅ 一键补录</button>' +
+    '</div>';
+}
+
+function hideSleepScheduleHint() {
+  var container = document.getElementById('sleepScheduleHint');
+  if (container) container.style.display = 'none';
+}
+
+// 从日程数据补录睡眠到 sleep_log
+// 智能合并：如果今天凌晨有 sleep 段且昨晚也有，合并为一条跨天记录
+function fillSleepFromSchedule() {
+  var todaySegs = getScheduleSleepSegs(today());
+  var yesterday = dayBefore(today());
+  var yesterdaySegs = getScheduleSleepSegs(yesterday);
+  if (todaySegs.length === 0 && yesterdaySegs.length === 0) {
+    showToast('未找到日程中的睡眠数据');
+    return;
+  }
+  var logs = loadSleepLog();
+  var added = 0;
+
+  // 找出今天凌晨的 sleep 段（startMin < 12*60 即中午12点前开始的）
+  var todayEarlySegs = todaySegs.filter(function(seg) { return seg.startMin < 12 * 60; });
+  // 找出昨晚的 sleep 段（startMin >= 18*60 即晚上6点后开始的）
+  var yesterdayNightSegs = yesterdaySegs.filter(function(seg) { return seg.startMin >= 18 * 60; });
+  // 今天非凌晨的 sleep 段
+  var todayOtherSegs = todaySegs.filter(function(seg) { return seg.startMin >= 12 * 60; });
+
+  // 尝试合并：昨晚的 + 今天凌晨的 配对为一条跨天记录
+  var mergedYesterday = {}; // 记录已处理的 yesterday 段索引
+  var mergedToday = {};     // 记录已处理的 today 段索引
+
+  yesterdayNightSegs.forEach(function(ySeg, yi) {
+    // 找今天凌晨段来配对：startMin=0 或 startMin 接近 0 的
+    var matched = todayEarlySegs.find(function(tSeg, ti) {
+      return !mergedToday[ti] && tSeg.startMin <= 60; // 凌晨0:00~1:00开始的
+    });
+    if (matched) {
+      var ti = todayEarlySegs.indexOf(matched);
+      var sleepH = Math.floor(ySeg.startMin / 60) % 24;
+      var sleepM = ySeg.startMin % 60;
+      var wakeH = Math.floor(matched.endMin / 60) % 24;
+      var wakeM = matched.endMin % 60;
+      var totalDur = (1440 - ySeg.startMin) + matched.endMin; // 昨晚部分 + 今早部分
+      // 检查是否已有相同记录
+      var dup = logs.some(function(l) {
+        return l && l.date === today() && l.sleepH === sleepH && l.sleepM === sleepM && l.wakeH === wakeH && l.wakeM === wakeM;
+      });
+      if (!dup) {
+        var coins = calcSleepCoins(sleepH, sleepM);
+        logs.push({
+          date: today(),
+          sleepH: sleepH, sleepM: sleepM,
+          wakeH: wakeH, wakeM: wakeM,
+          durationMin: totalDur,
+          coins: coins,
+          manual: true,
+          source: 'schedule_fill'
+        });
+        added++;
+      }
+      mergedYesterday[yi] = true;
+      mergedToday[ti] = true;
+    }
+  });
+
+  // 处理未配对的昨晚 sleep 段（独立记录，date=昨天）
+  yesterdayNightSegs.forEach(function(seg, yi) {
+    if (mergedYesterday[yi]) return;
+    var sleepH = Math.floor(seg.startMin / 60) % 24;
+    var sleepM = seg.startMin % 60;
+    var wakeH = Math.floor(seg.endMin / 60) % 24;
+    var wakeM = seg.endMin % 60;
+    var durMin = seg.endMin - seg.startMin;
+    if (durMin < 1) return;
+    // 如果 endMin=1440 (24:00)，表示到午夜，检查是否已有跨天记录
+    var dup = logs.some(function(l) {
+      return l && l.date === yesterday && l.sleepH === sleepH && l.sleepM === sleepM;
+    });
+    if (dup) return;
+    var coins = calcSleepCoins(sleepH, sleepM);
+    logs.push({
+      date: yesterday,
+      sleepH: sleepH, sleepM: sleepM,
+      wakeH: wakeH, wakeM: wakeM,
+      durationMin: durMin,
+      coins: coins,
+      manual: true,
+      source: 'schedule_fill'
+    });
+    added++;
+  });
+
+  // 处理未配对的今天凌晨 sleep 段（独立记录）
+  todayEarlySegs.forEach(function(seg, ti) {
+    if (mergedToday[ti]) return;
+    var sleepH = Math.floor(seg.startMin / 60) % 24;
+    var sleepM = seg.startMin % 60;
+    var wakeH = Math.floor(seg.endMin / 60) % 24;
+    var wakeM = seg.endMin % 60;
+    var durMin = seg.endMin - seg.startMin;
+    if (durMin < 1) return;
+    var dup = logs.some(function(l) {
+      return l && l.date === today() && l.sleepH === sleepH && l.sleepM === sleepM && l.wakeH === wakeH && l.wakeM === wakeM;
+    });
+    if (dup) return;
+    // 凌晨段独立记录时，金币为0（因为入睡时间实际是昨晚，但这里只有凌晨部分）
+    logs.push({
+      date: today(),
+      sleepH: sleepH, sleepM: sleepM,
+      wakeH: wakeH, wakeM: wakeM,
+      durationMin: durMin,
+      coins: 0,
+      manual: true,
+      source: 'schedule_fill'
+    });
+    added++;
+  });
+
+  // 处理今天非凌晨的 sleep 段（午睡等）
+  todayOtherSegs.forEach(function(seg) {
+    var sleepH = Math.floor(seg.startMin / 60) % 24;
+    var sleepM = seg.startMin % 60;
+    var wakeH = Math.floor(seg.endMin / 60) % 24;
+    var wakeM = seg.endMin % 60;
+    var durMin = seg.endMin - seg.startMin;
+    if (durMin < 1) return;
+    var dup = logs.some(function(l) {
+      return l && l.date === today() && l.sleepH === sleepH && l.sleepM === sleepM && l.wakeH === wakeH && l.wakeM === wakeM;
+    });
+    if (dup) return;
+    var coins = calcSleepCoins(sleepH, sleepM);
+    logs.push({
+      date: today(),
+      sleepH: sleepH, sleepM: sleepM,
+      wakeH: wakeH, wakeM: wakeM,
+      durationMin: durMin,
+      coins: coins,
+      manual: true,
+      source: 'schedule_fill'
+    });
+    added++;
+  });
+
+  if (added === 0) {
+    showToast('这些睡眠记录已存在，无需重复补录');
+    return;
+  }
+  saveSleepLog(logs);
+  // 刷新UI
+  updateSleepView();
+  renderSleepHistory();
+  refreshSleepDuration();
+  refreshStatsSchedule();
+  showToast('✅ 已从日程补录 ' + added + ' 条睡眠记录');
 }
 
 // ========== 打卡页睡眠时长显示 ==========
