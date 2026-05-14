@@ -3420,6 +3420,8 @@ function saveCheckin(isCheckin) {
     });
     var wasAlreadyCheckedIn = existed.checkedIn && !isCheckin;
     saveData(G); renderAll();
+initTimer();
+
     if (isCheckin) {
       showToast('💰 总资产鎴愬姛类型?);
       showQuoteModal('evening');
@@ -5432,6 +5434,106 @@ function showToast(msg) {
 const TIMER_KEY = 'codex_timer_v1';
 const TIMER_LOG_KEY = 'codex_timer_log_v1';
 const TIMER_STATE_KEY = 'codex_timer_state_v1';   // 杩愯⚔️ 劳动战线称号：14:30前60学分跺櫒鐘舵€?const PENDING_TIMER_KEY = 'codex_pending_timer_v1'; // 寰呬繚瀛樼殑计时鏁版嵁
+
+// ===== 计时器后台恢复 =====
+var timerState = {
+  mode: 'study',
+  running: false,
+  paused: false,
+  elapsed: 0,
+  startTs: null,
+  intervalId: null,
+};
+var _pendingTimer = null;
+
+function saveTimerState() {
+  var saved = { mode: timerState.mode, running: timerState.running, paused: timerState.paused,
+                elapsed: timerState.elapsed, startTs: timerState.startTs };
+  localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(saved));
+}
+function loadTimerState() {
+  try { var raw = localStorage.getItem(TIMER_STATE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch(e) { return null; }
+}
+function clearTimerState() { localStorage.removeItem(TIMER_STATE_KEY); }
+function savePendingTimer() {
+  if (_pendingTimer) localStorage.setItem(PENDING_TIMER_KEY, JSON.stringify(_pendingTimer));
+  else localStorage.removeItem(PENDING_TIMER_KEY);
+}
+function loadPendingTimer() {
+  try { var raw = localStorage.getItem(PENDING_TIMER_KEY); return raw ? JSON.parse(raw) : null; }
+  catch(e) { return null; }
+}
+function clearPendingTimer() { _pendingTimer = null; localStorage.removeItem(PENDING_TIMER_KEY); }
+
+function initTimer() {
+  // 从localStorage恢复计时器状态
+  var saved = loadTimerState();
+  if (!saved) { updateTimerUI(); return; }
+  
+  // 跨日检测：startTs非今天则归档
+  if (saved.startTs) {
+    var startDay = new Date(saved.startTs).toDateString();
+    var today = new Date().toDateString();
+    if (startDay !== today && (saved.running || saved.paused)) {
+      // 跨日归档：计算到23:59:59的时长
+      var endOfStartDay = new Date(startDay);
+      endOfStartDay.setHours(23,59,59,999);
+      var crossDaySec = Math.floor((endOfStartDay.getTime() - saved.startTs) / 1000);
+      if (crossDaySec < 0) crossDaySec = 0;
+      
+      // 保存为昨天最后一段记录
+      var yesterday = new Date(saved.startTs);
+      var yKey = yesterday.getFullYear()+'-'+String(yesterday.getMonth()+1).padStart(2,'0')+'-'+String(yesterday.getDate()).padStart(2,'0');
+      var logs = loadTimerLog();
+      logs.push({ date: yKey, mode: saved.mode, seconds: crossDaySec,
+                  startMin: Math.floor(((saved.startTs % 86400000) / 60000)),
+                  endMin: 1439, tag: '', note: '(跨日自动归档)', startTs: saved.startTs });
+      saveTimerLog(logs);
+      
+      // 更新昨日累计
+      var d = loadTimerAccum();
+      if (d.date !== yKey) d = { date: yKey, study: 0, work: 0, sport: 0 };
+      d[saved.mode] = (d[saved.mode] || 0) + Math.floor(crossDaySec / 60);
+      saveTimerAccum(d);
+      
+      // 重置状态
+      timerState.mode = saved.mode;
+      timerState.running = true;
+      timerState.paused = false;
+      timerState.elapsed = 0;
+      timerState.startTs = Date.now();
+      saveTimerState();
+      timerState.intervalId = setInterval(timerTick, 500);
+      updateTimerUI();
+      return;
+    }
+  }
+  
+  // 恢复运行中/暂停中状态
+  timerState.mode = saved.mode;
+  timerState.elapsed = saved.elapsed || 0;
+  timerState.startTs = saved.startTs;
+  timerState.running = saved.running;
+  timerState.paused = saved.paused;
+  
+  if (saved.running && saved.startTs) {
+    var elapsed = Math.floor((Date.now() - saved.startTs) / 1000);
+    if (elapsed < 0) elapsed = 0;
+    timerState.elapsed = elapsed;
+    timerState.intervalId = setInterval(timerTick, 500);
+  }
+  
+  updateTimerUI();
+  
+  // 恢复pending timer（用户之前停了但没填标签）
+  var pending = loadPendingTimer();
+  if (pending) {
+    _pendingTimer = pending;
+    setTimeout(function() { openTimerTagModal(); }, 300);
+  }
+}
+
 
 // 计时鍣ㄧ姸鎬侊紙鎸佷箙鍖栤€斺€旈〉闈㈠埛鏂?鍚庡彴鎭㈠鍚庡彲鎭㈠类型?let timerState = {
   mode: 'study',        // study | work | sport
@@ -9801,7 +9903,490 @@ function submitNewQuote() {
   }
 }
 
-function escapeHtml(str) {
+functio
+
+// ==== 云同步 ====
+function exportData() {
+  const d = collectAllData();
+  const json = JSON.stringify(d, null, 2);
+  const fileName = '鑷緥鑰呮硶鍏竉澶囦唤_' + new Date().toISOString().slice(0,10) + '.json';
+
+  // 寮圭獥灞曠ず鏁版嵁锛屾敮鎸佷笅杞?澶嶅埗
+  var overlay = document.getElementById('exportDataOverlay');
+  if (!overlay) {
+    // 棣栨鍒涘缓寮圭獥
+    overlay = document.createElement('div');
+    overlay.id = 'exportDataOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:16px;font-weight:700;">馃摛 瀵煎嚭鏁版嵁</span>' +
+        '<button onclick="document.getElementById(\'exportDataOverlay\').style.display=\'none\'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">鉁</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">鏂瑰紡1锛氱偣鍑讳笅杞芥枃浠?| 鏂瑰紡2锛氬鍒舵枃鏈悗鍦ㄥ彟涓€璁惧绮樿创瀵煎叆</div>' +
+      '<textarea id="exportDataText" readonly style="flex:1;min-height:120px;max-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;resize:none;font-family:monospace;word-break:break-all;"></textarea>' +
+      '<div style="display:flex;gap:10px;margin-top:12px;">' +
+        '<button onclick="downloadExportFile()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;">馃捑 涓嬭浇鏂囦欢</button>' +
+        '<button onclick="copyExportData()" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">馃搵 澶嶅埗鏂囨湰</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('exportDataText').value = json;
+  overlay.style.display = 'flex';
+}
+
+function downloadExportFile() {
+  var text = document.getElementById('exportDataText').value;
+  var blob = new Blob([text], { type: 'application/json' });
+  var fileName = '鑷緥鑰呮硶鍏竉澶囦唤_' + new Date().toISOString().slice(0,10) + '.json';
+  if (window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, fileName);
+    return;
+  }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 300);
+  showToast('馃摛 鏂囦欢涓嬭浇涓?..');
+}
+
+function copyExportData() {
+  var text = document.getElementById('exportDataText').value;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('鉁?宸插鍒跺埌鍓创鏉匡紝鍙矘璐村埌鍙︿竴璁惧瀵煎叆');
+    }).catch(function() {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.getElementById('exportDataText');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    showToast('鉁?宸插鍒跺埌鍓创鏉?);
+  } catch(e) {
+    showToast('鉂?澶嶅埗澶辫触锛岃鎵嬪姩闀挎寜鏂囨湰閫夋嫨澶嶅埗');
+  }
+}
+
+function importData() {
+  const input = document.getElementById('importFileInput');
+  if (input) input.click();
+}
+
+// 鎵撳紑瀵煎叆寮圭獥锛堟敮鎸佹枃浠堕€夋嫨 + 绮樿创鏂囨湰锛?function openImportModal() {
+  var overlay = document.getElementById('importDataOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'importDataOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:20px;width:100%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:16px;font-weight:700;">馃搨 瀵煎叆鏁版嵁</span>' +
+        '<button onclick="document.getElementById(\'importDataOverlay\').style.display=\'none\'" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">鉁</button>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">鏂瑰紡1锛氶€夋嫨澶囦唤鏂囦欢 | 鏂瑰紡2锛氱矘璐翠粠鍙︿竴璁惧澶嶅埗鐨勬枃鏈</div>' +
+      '<button onclick="document.getElementById(\'importFileInput\').click(); document.getElementById(\'importDataOverlay\').style.display=\'none\';" style="width:100%;padding:12px;border-radius:10px;border:1px dashed var(--border);background:var(--card2);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:10px;">馃搧 閫夋嫨澶囦唤鏂囦欢</button>' +
+      '<textarea id="importDataText" placeholder="鎴栧湪姝ょ矘璐村浠芥暟鎹枃鏈?.." style="flex:1;min-height:120px;max-height:200px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;resize:none;font-family:monospace;word-break:break-all;"></textarea>' +
+      '<button onclick="importFromText()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--gold);color:#000;font-weight:700;font-size:14px;cursor:pointer;margin-top:10px;">馃搨 瀵煎叆鏂囨湰鏁版嵁</button>' +
+    '</div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('importDataText').value = '';
+  overlay.style.display = 'flex';
+}
+
+function importFromText() {
+  var text = document.getElementById('importDataText').value.trim();
+  if (!text) { showToast('璇峰厛绮樿创澶囦唤鏁版嵁'); return; }
+  try {
+    var data = JSON.parse(text);
+    if (!data || typeof data !== 'object') throw new Error('鏃犳晥鐨勬暟鎹牸寮?);
+    var hasKnown = SYNC_DATA_KEYS.some(function(k) { return data[k] !== undefined; });
+    if (!hasKnown) throw new Error('鏈瘑鍒殑澶囦唤鏁版嵁');
+    if (!confirm('瀵煎叆灏嗚鐩栧綋鍓嶆湰鍦版暟鎹紝纭畾缁х画锛?)) return;
+    applyAllData(data);
+    G = loadData();
+    timerAccum = loadTimerAccum();
+    updatePreview(); renderAll();
+    updateSleepView(); renderSleepHistory();
+    refreshSleepDuration();
+    document.getElementById('importDataOverlay').style.display = 'none';
+    showToast('馃搨 澶囦唤鏁版嵁宸插鍏?);
+  } catch(err) {
+    showToast('鉂?瀵煎叆澶辫触锛? + err.message);
+  }
+}
+
+function handleFileImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || typeof data !== 'object') throw new Error('鏃犳晥鐨勬枃浠舵牸寮?);
+      const hasKnown = SYNC_DATA_KEYS.some(k => data[k] !== undefined);
+      if (!hasKnown) throw new Error('鏈瘑鍒殑澶囦唤鏂囦欢');
+      if (!confirm('瀵煎叆灏嗚鐩栧綋鍓嶆湰鍦版暟鎹紝纭畾缁х画锛?)) return;
+      applyAllData(data);
+      G = loadData();
+      timerAccum = loadTimerAccum();
+      updatePreview(); renderAll();
+      updateSleepView(); renderSleepHistory();
+      showToast('馃搨 澶囦唤鏁版嵁宸插鍏?);
+    } catch(err) {
+      showToast('鉂?瀵煎叆澶辫触锛? + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// 涓哄鍏ョ殑鏃ョ▼鏁版嵁鑷姩鍒涘缓打卡璁板綍锛堝鏋滀笉瀛樺湪锛?
+// ========== 浜戠鍚屾 (GitHub Gist) ==========
+// (SYNC_TOKEN_KEY 绛夊父閲忓凡绉昏嚦鏂囦欢椤堕儴)
+
+function openSyncModal() {
+  const m = document.getElementById('syncModal');
+  m.style.display = 'flex';
+  document.getElementById('syncToken').value = localStorage.getItem(SYNC_TOKEN_KEY) || '';
+  document.getElementById('syncGistId').value = localStorage.getItem(SYNC_GIST_KEY) || '';
+  // 閲嶇疆鎸夐挳鐘舵€侊紙闃叉disabled娈嬬暀锛?  var btnPush = document.getElementById('btnPushCloud');
+  var btnPull = document.getElementById('btnPullCloud');
+  if (btnPush) { btnPush.disabled = false; btnPush.textContent = '鈽侊笍 涓婁紶鍒颁簯'; }
+  if (btnPull) { btnPull.disabled = false; btnPull.textContent = '馃摜 浠庝簯涓嬭浇'; }
+  const s = document.getElementById('syncStatus');
+  const token = localStorage.getItem(SYNC_TOKEN_KEY);
+  const gid = localStorage.getItem(SYNC_GIST_KEY);
+  if (token && gid) {
+    s.innerHTML = '<span style="color:#55efc4;">鉁?宸查厤缃悓姝?(Gist: ' + gid.slice(0,8) + '...)</span>';
+  } else if (token) {
+    s.innerHTML = '<span style="color:#f5a623;">鈿狅笍 Token宸蹭繚瀛橈紝灏氭湭鍒涘缓浜戠澶囦唤</span>';
+  } else {
+    s.innerHTML = '';
+  }
+}
+
+function closeSyncModal() {
+  document.getElementById('syncModal').style.display = 'none';
+}
+
+function saveSyncConfig() {
+  const token = document.getElementById('syncToken').value.trim();
+  const gistId = document.getElementById('syncGistId').value.trim();
+  if (!token) { showToast('璇疯緭鍏?GitHub Token'); return; }
+  localStorage.setItem(SYNC_TOKEN_KEY, token);
+  if (gistId) localStorage.setItem(SYNC_GIST_KEY, gistId);
+  else localStorage.removeItem(SYNC_GIST_KEY);
+  showToast('鈽侊笍 鍚屾閰嶇疆宸蹭繚瀛?);
+  document.getElementById('syncStatus').innerHTML = '<span style="color:#55efc4;">鉁?閰嶇疆宸蹭繚瀛</span>';
+}
+
+async function testSync() {
+  const token = document.getElementById('syncToken').value.trim() || localStorage.getItem(SYNC_TOKEN_KEY);
+  if (!token) { showToast('璇峰厛杈撳叆 Token'); return; }
+  const s = document.getElementById('syncStatus');
+  s.innerHTML = '<span style="color:#55efc4;font-size:14px;">鈴?杩炴帴涓紝璇风◢鍊?..</span>';
+  showToast('鈴?姝ｅ湪娴嬭瘯杩炴帴...');
+  try {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    const resp = await fetch('https://api.github.com/user', {
+      headers: { 'Authorization': 'token ' + token },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const user = await resp.json();
+      s.innerHTML = '<span style="color:#55efc4;">鉁?杩炴帴鎴愬姛锛佺敤鎴? ' + user.login + '</span>';
+      showToast('鉁?GitHub 杩炴帴鎴愬姛');
+    } else {
+      s.innerHTML = '<span style="color:#fc5c65;">鉂?Token鏃犳晥 (HTTP ' + resp.status + ')</span>';
+      showToast('鉂?Token鏃犳晥');
+    }
+  } catch(e) {
+    var errMsg = e.name === 'AbortError' ? '杩炴帴瓒呮椂(10绉?锛屽浗鍐呯綉缁滃彲鑳芥棤娉曡闂?GitHub API' : e.message;
+    s.innerHTML = '<span style="color:#fc5c65;">鉂?缃戠粶閿欒: ' + errMsg + '</span>';
+    showToast('鉂?杩炴帴澶辫触: ' + errMsg);
+  }
+}
+
+function collectAllData() {
+  const d = { _meta: { version: 3, exportedAt: new Date().toISOString() } };
+  SYNC_DATA_KEYS.forEach(k => {
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw !== null) {
+        d[k] = JSON.parse(raw);
+      }
+      // raw === null 鏃朵笉璁剧疆 d[k]锛岄伩鍏嶄笂浼?null 鍒颁簯绔?    }
+    catch(e) { d[k] = localStorage.getItem(k); }
+  });
+  return d;
+}
+
+function applyAllData(data) {
+  if (!data) return;
+  var logMsgs = [];
+  SYNC_DATA_KEYS.forEach(k => {
+    if (data[k] !== undefined && data[k] !== null) {
+      const v = typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k]);
+      localStorage.setItem(k, v);
+      logMsgs.push(k + '(鈭?');
+    } else if (data[k] === null) {
+      // null 琛ㄧず浜戠璇ュ瓧娈典负绌猴紝娓呴櫎鏈湴瀵瑰簲key
+      localStorage.removeItem(k);
+      logMsgs.push(k + '(娓呴櫎)');
+    } else {
+      logMsgs.push(k + '(璺宠繃:undefined)');
+    }
+  });
+  console.log('[sync] applyAllData 瀹屾垚, 鍐欏叆鎯呭喌:', logMsgs.join(', '));
+}
+
+async function pushToCloud(btn) {
+  var s = document.getElementById('syncStatus');
+  var origText = btn ? btn.textContent : '';
+  try {
+    if (s) s.innerHTML = '<span style="color:#f5a623;font-size:15px;">鈴?寮€濮嬩笂浼?..</span>';
+    if (btn) { btn.textContent = '鈴?涓婁紶涓?..'; btn.disabled = true; }
+  } catch(e2) {}
+
+  try {
+    // 浼樺厛浠庤緭鍏ユ鍙栧€硷紝鍚屾椂鑷姩淇濆瓨閰嶇疆
+    var tokenEl = document.getElementById('syncToken');
+    var gistEl = document.getElementById('syncGistId');
+    var token = (tokenEl ? tokenEl.value.trim() : '') || localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = (gistEl ? gistEl.value.trim() : '') || localStorage.getItem(SYNC_GIST_KEY);
+    if (token && tokenEl) { localStorage.setItem(SYNC_TOKEN_KEY, token); }
+    if (gistId && gistEl) { localStorage.setItem(SYNC_GIST_KEY, gistId); }
+    if (!token) {
+      showToast('璇峰厛杈撳叆 GitHub Token');
+      if (btn) { btn.disabled = false; btn.textContent = '鈽侊笍 涓婁紶鍒颁簯'; }
+      return;
+    }
+
+    var allData = collectAllData();
+    var content = JSON.stringify(allData, null, 2);
+    if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">鈴?涓婁紶涓紝璇风◢鍊?..</span>';
+    showToast('鈴?姝ｅ湪涓婁紶鍒颁簯绔?..');
+
+    var url, method, body;
+    var files = { 'codex_data.json': { content: content } };
+    if (gistId) {
+      url = 'https://api.github.com/gists/' + gistId;
+      method = 'PATCH';
+      body = { files: files };
+    } else {
+      url = 'https://api.github.com/gists';
+      method = 'POST';
+      body = { description: '鑷緥鑰呮硶鍏?- 浜戠澶囦唤', public: false, files: files };
+    }
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    var resp = await fetch(url, {
+      method: method,
+      headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!resp.ok) {
+      var err = await resp.json().catch(function() { return {}; });
+      throw new Error('HTTP ' + resp.status + (err.message ? ': ' + err.message : ''));
+    }
+    var result = await resp.json();
+    if (!gistId) {
+      gistId = result.id;
+      localStorage.setItem(SYNC_GIST_KEY, gistId);
+      var inp = document.getElementById('syncGistId');
+      if (inp) inp.value = gistId;
+    }
+    if (s) s.innerHTML = '<span style="color:#55efc4;">鉁?涓婁紶鎴愬姛锛丟ist: ' + gistId.slice(0,8) + '...</span>';
+    showToast('鈽侊笍 浜戠澶囦唤鎴愬姛');
+  } catch(e) {
+    var errMsg = e.message || '鏈煡閿欒';
+    if (e.name === 'AbortError') errMsg = '杩炴帴瓒呮椂(10绉?锛屽浗鍐呯綉缁滃彲鑳芥棤娉曡闂?api.github.com';
+    console.error('[sync] pushToCloud error:', e);
+    if (s) s.innerHTML = '<span style="color:#fc5c65;">鉂?涓婁紶澶辫触: ' + errMsg + '</span>';
+    showToast('鉂?浜戠涓婁紶澶辫触: ' + errMsg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText || '鈽侊笍 涓婁紶鍒颁簯'; }
+  }
+}
+
+async function pullFromCloud(btn) {
+  // === 鍏ュ彛纭 ===
+  var s = document.getElementById('syncStatus');
+  var origText2 = btn ? btn.textContent : '';
+  try {
+    if (s) s.innerHTML = '<span style="color:#f5a623;font-size:15px;">鈴?寮€濮嬩笅杞?..</span>';
+    if (btn) { btn.textContent = '鈴?涓嬭浇涓?..'; btn.disabled = true; }
+  } catch(e2) {}
+
+  try {
+    // 浼樺厛浠庤緭鍏ユ鍙栧€硷紝鍚屾椂鑷姩淇濆瓨閰嶇疆
+    var tokenEl = document.getElementById('syncToken');
+    var gistEl = document.getElementById('syncGistId');
+    var token = (tokenEl ? tokenEl.value.trim() : '') || localStorage.getItem(SYNC_TOKEN_KEY);
+    var gistId = (gistEl ? gistEl.value.trim() : '') || localStorage.getItem(SYNC_GIST_KEY);
+    if (token && tokenEl) { localStorage.setItem(SYNC_TOKEN_KEY, token); }
+    if (gistId && gistEl) { localStorage.setItem(SYNC_GIST_KEY, gistId); }
+    if (!token || !gistId) {
+      showToast('璇峰厛杈撳叆 Token 鍜?Gist ID');
+      if (btn) { btn.disabled = false; btn.textContent = '馃摜 浠庝簯涓嬭浇'; }
+      return;
+    }
+
+    if (s) s.innerHTML = '<span style="color:#55efc4;font-size:14px;">鈴?涓嬭浇涓紝璇风◢鍊?..</span>';
+    showToast('鈴?姝ｅ湪浠庝簯绔笅杞?..');
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    var resp = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: { 'Authorization': 'token ' + token },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var gist = await resp.json();
+    var file = gist.files['codex_data.json'];
+    if (!file || !file.content) throw new Error('浜戠鏃犳暟鎹枃浠?);
+    var cloudData = JSON.parse(file.content);
+
+    try {
+      applyAllData(cloudData);
+      console.log('[sync] applyAllData 瀹屾垚');
+      // 楠岃瘉鍐欏叆缁撴灉
+      var _verify = localStorage.getItem('codex_data_v2');
+      console.log('[sync] 楠岃瘉: codex_data_v2 鍐欏叆鍚庨暱搴?', (_verify||'').length, '鍓?0瀛楃=', (_verify||'').substring(0,50));
+    } catch(e1) {
+      console.error('[sync] applyAllData 閿欒:', e1);
+      throw new Error('applyAllData 澶辫触: ' + e1.message);
+    }
+
+    if (s) s.innerHTML = '<span style="color:#55efc4;">鉁?鏁版嵁鍐欏叆鎴愬姛锛佹鍦ㄥ埛鏂扮晫闈?..</span>';
+    showToast('鈽侊笍 鏁版嵁宸插啓鍏ワ紝姝ｅ湪鍒锋柊鐣岄潰...');
+
+    // Refresh entire UI
+    try {
+      console.log('[sync] 寮€濮?loadData()');
+      G = loadData();
+      var _recLen = (G.records||[]).length;
+      var _repLen = (G.repairedDays||[]).length;
+      console.log('[sync] loadData 瀹屾垚, G.records 鏁伴噺:', _recLen, ', G.repairedDays 鏁伴噺:', _repLen);
+      // 浜戠璁板綍鏁?vs 鏈湴璁板綍鏁?瀵规瘮
+      var _cloudRecLen = (cloudData['codex_data_v2'] && cloudData['codex_data_v2'].records) ? cloudData['codex_data_v2'].records.length : '(浜戠鏃犳瀛楁)';
+      console.log('[sync] 浜戠璁板綍鏁?', _cloudRecLen, '鏈湴璁板綍鏁?', _recLen);
+      if (_cloudRecLen !== '(浜戠鏃犳瀛楁)' && _recLen !== _cloudRecLen) {
+        showToast('鈿狅笍 璀﹀憡锛氫簯绔湁' + _cloudRecLen + '鏉¤褰曪紝浣嗘湰鍦板彧鍔犺浇浜? + _recLen + '鏉?);
+      }
+    } catch(e2) {
+      console.error('[sync] loadData 閿欒:', e2);
+      throw new Error('loadData 澶辫触: ' + e2.message);
+    }
+    
+    try {
+      displayToday(); updatePreview();
+      console.log('[sync] displayToday+updatePreview 瀹屾垚');
+    } catch(e3a) {
+      console.error('[sync] displayToday/updatePreview 閿欒:', e3a);
+      // 闈炶嚧鍛斤紝缁х画
+    }
+    
+    try {
+      renderStats();
+      console.log('[sync] renderStats 瀹屾垚');
+    } catch(e3b) {
+      console.error('[sync] renderStats 閿欒:', e3b);
+    }
+    
+    try {
+      renderWallet();
+      console.log('[sync] renderWallet 瀹屾垚');
+    } catch(e3c) {
+      console.error('[sync] renderWallet 閿欒:', e3c);
+    }
+    
+    try {
+      renderStreak();
+      console.log('[sync] renderStreak 瀹屾垚');
+    } catch(e3d) {
+      console.error('[sync] renderStreak 閿欒:', e3d);
+    }
+    
+    try {
+      renderHistory();
+      console.log('[sync] renderHistory 瀹屾垚, 璁板綍鏁?', (G.records||[]).length);
+      showToast('鉁?鍒锋柊瀹屾垚锛佸凡鍔犺浇 ' + (G.records||[]).length + ' 鏉¤褰?);
+    } catch(e3e) {
+      console.error('[sync] renderHistory 閿欒:', e3e);
+      showToast('鈿狅笍 历史娓叉煋閿欒: ' + (e3e.message||'鏈煡'));
+    }
+    
+    try {
+      renderQuoteManage();
+      updateExchangePreview();
+      console.log('[sync] 鍏朵粬娓叉煋瀹屾垚');
+    } catch(e3f) {
+      console.error('[sync] 鍏朵粬娓叉煋閿欒:', e3f);
+    }
+    
+    try {
+      timerAccum = loadTimerAccum(); renderTimerAccum();
+      updateSleepView(); renderSleepHistory();
+      console.log('[sync] 睡眠鐣岄潰鍒锋柊瀹屾垚');
+    } catch(e4) {
+      console.error('[sync] 睡眠鐣岄潰鍒锋柊閿欒:', e4);
+    }
+  } catch(e) {
+    var errMsg = e.message || '鏈煡閿欒';
+    if (e.name === 'AbortError') errMsg = '杩炴帴瓒呮椂(10绉?锛屽浗鍐呯綉缁滃彲鑳芥棤娉曡闂?api.github.com';
+    console.error('[sync] pullFromCloud error:', e);
+    // 鏄剧ず璇︾粏閿欒淇℃伅锛堝寘鍚爢鏍堬級
+    var detailMsg = errMsg;
+    if (e.stack) {
+      // 鎻愬彇鍫嗘爤绗竴琛?      var stackLine = e.stack.split('\n')[1] || '';
+      if (stackLine) detailMsg += ' | ' + stackLine.trim();
+    }
+    if (s) s.innerHTML = '<span style="color:#fc5c65;font-size:13px;">鉂?涓嬭浇澶辫触: ' + detailMsg + '</span>';
+    showToast('鉂?浜戠涓嬭浇澶辫触: ' + errMsg);
+    
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText2 || '馃摜 浠庝簯涓嬭浇'; }
+  }
+}
+
+// Debounced auto-sync: 10s after any data change
+let _autoSyncTimer = null;
+function scheduleAutoSync() {
+  const token = localStorage.getItem(SYNC_TOKEN_KEY);
+  const gistId = localStorage.getItem(SYNC_GIST_KEY);
+  if (!token || !gistId) return;
+  if (_autoSyncTimer) clearTimeout(_autoSyncTimer);
+  _autoSyncTimer = setTimeout(() => { pushToCloud(); }, 10000);
+}
+
+// Hook localStorage.setItem to trigger auto-sync
+const _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage
+
+n escapeHtml(str) {
   var div = document.createElement('div');
   div.appendChild(document.createTextNode(str));
   return div.innerHTML;
@@ -9890,6 +10475,98 @@ window.deleteSpend = deleteSpend;
   }
 });
 </script>
+
+
+<!-- 云同步弹窗 -->
+<div class="modal-overlay" id="syncModal" style="display:none;">
+  <div class="modal-box">
+    <button class="close-btn" onclick="closeSyncModal()">鉁</button>
+    <!-- 闅愯棌鐨勬枃浠跺鍏ヨ緭鍏ユ -->
+    <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleFileImport(event)">
+    <h2 style="text-align:center;color:#c8d6ff;margin-bottom:12px;font-size:18px;letter-spacing:2px;">鈽侊笍 浜戠鍚屾 / 鏈湴澶囦唤</h2>
+    <p style="text-align:center;font-size:12px;color:#888;margin-bottom:16px;">鏁版嵁淇濆瓨鍦?GitHub Gist锛屾墜鏈?鐢佃剳鑷姩鍚屾</p>
+
+    <div class="input-group">
+      <label style="font-size:13px;color:#aaa;">GitHub Token</label>
+      <input class="input-field" type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxx" style="font-family:monospace;border-color:#4a5ab5;background:#0d1b3e;">
+      <p style="font-size:11px;color:#666;margin-top:4px;">鍦?GitHub 鈫?Settings 鈫?Developer settings 鈫?Personal access tokens 鐢熸垚<br>鍕鹃€?<b style="color:#aaa;">gist</b> 鏉冮檺</p>
+    </div>
+
+    <div class="input-group">
+      <label style="font-size:13px;color:#aaa;">Gist ID锛堢暀绌哄垯鑷姩鍒涘缓锛</label>
+      <input class="input-field" type="text" id="syncGistId" placeholder="鐣欑┖=棣栨浣跨敤鑷姩鍒涘缓" style="border-color:#4a5ab5;background:#0d1b3e;">
+      <p style="font-size:11px;color:#666;margin-top:4px;">宸插悓姝ヨ繃鐨勮澶囪嚜鍔ㄥ～鍐欙紝鏃犻渶鎵嬪姩杈撳叆</p>
+    </div>
+
+    <div id="syncStatus" style="font-size:13px;text-align:center;margin:12px 0;min-height:20px;"></div>
+
+    <div style="display:flex;gap:10px;">
+      <button class="btn" onclick="saveSyncConfig()" style="flex:1;background:linear-gradient(135deg,#4a5ab5,#2d3a8c);color:#c8d6ff;">馃捑 淇濆瓨閰嶇疆</button>
+      <button class="btn" onclick="testSync()" style="flex:1;background:linear-gradient(135deg,#1a3a2a,#0f2a1a);color:#55efc4;">馃敆 娴嬭瘯杩炴帴</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn" id="btnPushCloud" onclick="pushToCloud(this)" style="flex:1;">鈽侊笍 涓婁紶鍒颁簯</button>
+      <button class="btn" id="btnPullCloud" onclick="pullFromCloud(this)" style="flex:1;">馃摜 浠庝簯涓嬭浇</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn" onclick="exportData()" style="flex:1;background:linear-gradient(135deg,#2a3a1a,#1a2a0f);color:#a5d6a7;">馃摛 瀵煎嚭鏁版嵁</button>
+      <button class="btn" onclick="openImportModal()" style="flex:1;background:linear-gradient(135deg,#3a2a1a,#2a1a0f);color:#ffcc80;">馃搨 瀵煎叆鏁版嵁</button>
+    </div>
+    <button class="btn" onclick="closeSyncModal()" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.05);color:#888;">鍏抽棴</button>
+
+    <div style="margin-top:14px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+      <p style="font-size:11px;color:#666;line-height:1.8;">
+        馃搶 <b style="color:#aaa;">浣跨敤璇存槑</b><br>
+        1. 鍦?GitHub 鐢熸垚甯?gist 鏉冮檺鐨?Token<br>
+        2. 濉叆 Token锛岄娆′娇鐢ㄧ暀绌?Gist ID<br>
+        3. 鐐?涓婁紶鍒颁簯"鍒涘缓浜戠澶囦唤<br>
+        4. 鍏朵粬璁惧濉叆鐩稿悓 Token + Gist ID 鍗冲彲鍚屾
+      </p>
+    </div>
+  </div>
+</div>
+
+
 </body>
 <!-- v 2026-05-14 09:10:00 -->
 </html>
+
+
+
+// ===== 后台恢复事件监听 =====
+window.addEventListener('beforeunload', function() {
+  if (timerState.running || timerState.paused) {
+    if (timerState.running && timerState.startTs) {
+      timerState.elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+    }
+    saveTimerState();
+  }
+  if (_pendingTimer) savePendingTimer();
+});
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    if (timerState.running && timerState.startTs) {
+      timerState.elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+      saveTimerState();
+    }
+  } else {
+    if (timerState.running && timerState.startTs) {
+      var elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+      if (elapsed < 0) elapsed = 0;
+      timerState.elapsed = elapsed;
+      updateTimerUI();
+    }
+  }
+});
+
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted && timerState.running && timerState.startTs) {
+    var elapsed = Math.floor((Date.now() - timerState.startTs) / 1000);
+    if (elapsed < 0) elapsed = 0;
+    timerState.elapsed = elapsed;
+    clearInterval(timerState.intervalId);
+    timerState.intervalId = setInterval(timerTick, 500);
+    updateTimerUI();
+  }
+});
