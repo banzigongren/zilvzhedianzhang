@@ -5508,10 +5508,31 @@ function updateSleepView() {
       );
       hideSleepScheduleHint();
     } else {
-      document.getElementById('sleepNotInBed').style.display = 'block';
-      document.getElementById('sleepWokeUp').style.display = 'none';
-      // 检查日程中是否有睡眠段，显示补录提示
-      showSleepScheduleHint();
+      // 无今日睡眠记录：尝试自动从日程补录
+      var filled = fillSleepFromSchedule(true); // silent mode
+      var logs2 = loadSleepLog();
+      var todayLogs2 = logs2.filter(function(l) { return l && l.date === today() && l.sleepH != null; });
+      if (todayLogs2.length > 0) {
+        // 补录成功，显示起床结果
+        var latestLog2 = todayLogs2[todayLogs2.length - 1];
+        showWakeResult(
+          Math.floor(latestLog2.durationMin / 60),
+          latestLog2.durationMin % 60,
+          latestLog2.sleepH, latestLog2.sleepM,
+          latestLog2.wakeH, latestLog2.wakeM,
+          latestLog2.coins
+        );
+        hideSleepScheduleHint();
+        renderSleepHistory();
+        refreshSleepDuration();
+        refreshStatsSchedule();
+        if (filled > 0) showToast('✅ 已从日程自动补录 ' + filled + ' 条睡眠记录');
+      } else {
+        // 日程中也没有睡眠数据，保持默认状态
+        document.getElementById('sleepNotInBed').style.display = 'block';
+        document.getElementById('sleepWokeUp').style.display = 'none';
+        hideSleepScheduleHint();
+      }
     }
   }
 }
@@ -5620,13 +5641,14 @@ function hideSleepScheduleHint() {
 
 // 从日程数据补录睡眠到 sleep_log
 // 智能合并：如果今天凌晨有 sleep 段且昨晚也有，合并为一条跨天记录
-function fillSleepFromSchedule() {
+// silent=true 时不显示 toast，不调用 updateSleepView（由调用方处理），返回添加条数
+function fillSleepFromSchedule(silent) {
   var todaySegs = getScheduleSleepSegs(today());
   var yesterday = dayBefore(today());
   var yesterdaySegs = getScheduleSleepSegs(yesterday);
   if (todaySegs.length === 0 && yesterdaySegs.length === 0) {
-    showToast('未找到日程中的睡眠数据');
-    return;
+    if (!silent) showToast('未找到日程中的睡眠数据');
+    return 0;
   }
   var logs = loadSleepLog();
   var added = 0;
@@ -5755,16 +5777,18 @@ function fillSleepFromSchedule() {
   });
 
   if (added === 0) {
-    showToast('这些睡眠记录已存在，无需重复补录');
-    return;
+    if (!silent) showToast('这些睡眠记录已存在，无需重复补录');
+    return 0;
   }
   saveSleepLog(logs);
-  // 刷新UI
-  updateSleepView();
-  renderSleepHistory();
-  refreshSleepDuration();
-  refreshStatsSchedule();
-  showToast('✅ 已从日程补录 ' + added + ' 条睡眠记录');
+  if (!silent) {
+    updateSleepView();
+    renderSleepHistory();
+    refreshSleepDuration();
+    refreshStatsSchedule();
+    showToast('✅ 已从日程补录 ' + added + ' 条睡眠记录');
+  }
+  return added;
 }
 
 // ========== 打卡页睡眠时长显示 ==========
