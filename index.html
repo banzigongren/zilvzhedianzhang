@@ -5246,6 +5246,9 @@ function initSleepPage() {
     showSleepLock();
   }
 
+  // 自动从日程补录所有历史睡眠记录（非今日的也补）
+  autoSyncAllScheduleSleep();
+
   renderSleepHistory();
   updateSleepView();
 }
@@ -5639,6 +5642,151 @@ function hideSleepScheduleHint() {
   if (container) container.style.display = 'none';
 }
 
+// ========== 全量扫描所有日程日期，自动补录缺失的睡眠记录 ==========
+function autoSyncAllScheduleSleep() {
+  var schedules = loadScheduleData();
+  if (!schedules || schedules.length === 0) return;
+  var logs = loadSleepLog();
+  var totalAdded = 0;
+
+  // 收集所有有睡眠段的日期
+  var datesWithSleep = {};
+  schedules.forEach(function(s) {
+    if (!s.segments) return;
+    var sleepSegs = s.segments.filter(function(seg) {
+      return seg.type === 'sleep' && (seg.source === 'manual' || seg.source === 'import');
+    });
+    if (sleepSegs.length > 0) {
+      datesWithSleep[s.date] = sleepSegs;
+    }
+  });
+
+  // 对每个有睡眠段的日期，检查并补录
+  Object.keys(datesWithSleep).forEach(function(dateStr) {
+    // 检查是否已有睡眠记录
+    var existing = logs.filter(function(l) {
+      return l && l.date === dateStr && l.sleepH != null;
+    });
+    if (existing.length > 0) return; // 已有记录，跳过
+
+    var segs = datesWithSleep[dateStr];
+    // 分类：凌晨段(startMin<12*60) 和 非凌晨段
+    var earlySegs = segs.filter(function(s) { return s.startMin < 12 * 60; });
+    var otherSegs = segs.filter(function(s) { return s.startMin >= 12 * 60; });
+
+    // 处理非凌晨段（正常入睡）
+    otherSegs.forEach(function(seg) {
+      var sleepH = Math.floor(seg.startMin / 60) % 24;
+      var sleepM = seg.startMin % 60;
+      var wakeH = Math.floor(seg.endMin / 60) % 24;
+      var wakeM = seg.endMin % 60;
+      var durMin = seg.endMin - seg.startMin;
+      if (durMin < 1) return;
+      var dup = logs.some(function(l) {
+        return l && l.date === dateStr && l.sleepH === sleepH && l.sleepM === sleepM;
+      });
+      if (dup) return;
+      logs.push({
+        date: dateStr,
+        sleepH: sleepH, sleepM: sleepM,
+        wakeH: wakeH, wakeM: wakeM,
+        durationMin: durMin,
+        coins: calcSleepCoins(sleepH, sleepM),
+        manual: true,
+        source: 'schedule_fill'
+      });
+      totalAdded++;
+    });
+
+    // 处理凌晨段：检查前一天是否有晚间睡眠段可以合并
+    earlySegs.forEach(function(seg) {
+      var nextDay = dateStr; // 这个日期标记的是"当天"，但其实是凌晨（跨天的后半段）
+      var prevDay = dayBefore(nextDay);
+      var prevSegs = datesWithSleep[prevDay];
+      var prevNightSeg = null;
+      if (prevSegs) {
+        prevNightSeg = prevSegs.find(function(s) { return s.startMin >= 18 * 60; });
+      }
+      if (prevNightSeg) {
+        // 合并为一条跨天记录
+        var sleepH = Math.floor(prevNightSeg.startMin / 60) % 24;
+        var sleepM = prevNightSeg.startMin % 60;
+        var wakeH = Math.floor(seg.endMin / 60) % 24;
+        var wakeM = seg.endMin % 60;
+        var totalDur = (1440 - prevNightSeg.startMin) + seg.endMin;
+        var dup = logs.some(function(l) {
+          return l && l.date === nextDay && l.sleepH === sleepH && l.sleepM === sleepM && l.wakeH === wakeH && l.wakeM === wakeM;
+        });
+        if (!dup) {
+          logs.push({
+            date: nextDay,
+            sleepH: sleepH, sleepM: sleepM,
+            wakeH: wakeH, wakeM: wakeM,
+            durationMin: totalDur,
+            coins: calcSleepCoins(sleepH, sleepM),
+            manual: true,
+            source: 'schedule_fill'
+          });
+          totalAdded++;
+        }
+        // 标记前一天的晚间段已处理
+        prevNightSeg._merged = true;
+      } else {
+        // 无法合并，独立记录（金币为0）
+        var sleepH2 = Math.floor(seg.startMin / 60) % 24;
+        var sleepM2 = seg.startMin % 60;
+        var wakeH2 = Math.floor(seg.endMin / 60) % 24;
+        var wakeM2 = seg.endMin % 60;
+        var durMin2 = seg.endMin - seg.startMin;
+        if (durMin2 < 1) return;
+        logs.push({
+          date: nextDay,
+          sleepH: sleepH2, sleepM: sleepM2,
+          wakeH: wakeH2, wakeM: wakeM2,
+          durationMin: durMin2,
+          coins: 0,
+          manual: true,
+          source: 'schedule_fill'
+        });
+        totalAdded++;
+      }
+    });
+  });
+
+  // 补录前一天那些晚间段（endMin=1440 即到24:00的，如果没有被合并）
+  Object.keys(datesWithSleep).forEach(function(dateStr) {
+    var segs = datesWithSleep[dateStr];
+    segs.forEach(function(seg) {
+      if (seg._merged) return;
+      if (seg.startMin < 18 * 60) return; // 不是晚间段
+      // 检查是否已有记录
+      var sleepH = Math.floor(seg.startMin / 60) % 24;
+      var sleepM = seg.startMin % 60;
+      var existing = logs.some(function(l) {
+        return l && l.date === dateStr && l.sleepH === sleepH && l.sleepM === sleepM;
+      });
+      if (existing) return;
+      var durMin = seg.endMin - seg.startMin;
+      if (durMin < 1) return;
+      logs.push({
+        date: dateStr,
+        sleepH: sleepH, sleepM: sleepM,
+        wakeH: Math.floor(seg.endMin / 60) % 24,
+        wakeM: seg.endMin % 60,
+        durationMin: durMin,
+        coins: calcSleepCoins(sleepH, sleepM),
+        manual: true,
+        source: 'schedule_fill'
+      });
+      totalAdded++;
+    });
+  });
+
+  if (totalAdded > 0) {
+    saveSleepLog(logs);
+  }
+}
+
 // 从日程数据补录睡眠到 sleep_log
 // 智能合并：如果今天凌晨有 sleep 段且昨晚也有，合并为一条跨天记录
 // silent=true 时不显示 toast，不调用 updateSleepView（由调用方处理），返回添加条数
@@ -5965,7 +6113,7 @@ function renderSleepHistory() {
     return;
   }
 
-  const recent = [...logs].reverse().slice(0, 10);
+  const recent = [...logs].reverse();
   el.innerHTML = recent.filter(l => l && l.sleepH != null).map((l, i) => {
     const actualIdx = logs.indexOf(l);
     const hrs = Math.floor(l.durationMin / 60);
